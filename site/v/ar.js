@@ -1,7 +1,7 @@
 import { slot, currentWork, asset } from './slot.js';
 const status = document.getElementById('status');
 function tell(text) {
-  status.textContent = text;
+  if (status.textContent !== text) status.textContent = text;
 }
 function script(src) {
   return new Promise((resolve, reject) => {
@@ -51,17 +51,25 @@ async function start() {
   const model = element('a-entity', {
     'gltf-model': new URL(asset(slot + '.glb', work.source), location.href).href,
   });
-  let found = false,
-    loaded = false,
-    cameraFailed = false;
+  let found = false;
+  let loaded = false;
+  let failed = false;
+  const projected = new THREE.Vector3();
   function hint() {
-    if (cameraFailed) return;
+    if (failed) return;
     if (!loaded) tell('作品を読み込んでいます…');
-    else if (found) tell(slot + '番の作品を表示しています。');
-    else tell(slot + '番のカードの黒い枠を、カメラに全部入れてね。');
+    else if (!found) tell(slot + '番のカードの黒い枠を、カメラに全部入れてね。');
+    else if (scene.camera) {
+      // A perfectly head-on, flat square can produce a pose outside the camera frustum.
+      marker.object3D.getWorldPosition(projected).project(scene.camera);
+      const onScreen = [projected.x, projected.y, projected.z].every((value) => Math.abs(value) <= 1);
+      tell(
+        onScreen ? slot + '番の作品を表示しています。' : 'カードを少し傾けて、黒い枠全体を映してね。',
+      );
+    }
   }
   window.addEventListener('camera-error', () => {
-    cameraFailed = true;
+    failed = true;
     tell('カメラを開けませんでした。ブラウザのカメラ利用を許可して、開き直してください。');
   });
   window.addEventListener('camera-init', hint);
@@ -94,15 +102,19 @@ async function start() {
     loaded = true;
     hint();
   });
-  model.addEventListener('model-error', () =>
-    tell('立体の読み込みに失敗しました。「作品に戻る」からもう一度開いてください。'),
-  );
+  model.addEventListener('model-error', () => {
+    failed = true;
+    tell('立体の読み込みに失敗しました。「作品に戻る」からもう一度開いてください。');
+  });
   marker.append(model);
   scene.append(marker);
   scene.append(element('a-light', { type: 'ambient', color: '#ffffff', intensity: '1' }));
   scene.append(element('a-light', { type: 'directional', intensity: '0.65', position: '1 3 2' }));
   scene.append(element('a-entity', { camera: '' }));
   document.body.append(scene);
+  window.setInterval(() => {
+    if (found && loaded && !document.hidden) hint();
+  }, 500);
 }
 start().catch(() =>
   tell('ARを読み込めませんでした。接続を確認して「作品に戻る」から開き直してください。'),
