@@ -53,7 +53,7 @@ async function check() {
       model.setAttribute('touch-action', 'pan-y');
       model.setAttribute('shadow-intensity', '0.7');
       model.setAttribute('alt', slot + '番の絵からできた3D作品');
-      model.setAttribute('camera-orbit', '0deg 75deg auto');
+      model.setAttribute('camera-orbit', '180deg 80deg auto');
       model.setAttribute('loading', 'eager');
       model.addEventListener('load', () => {
         $('drawing').hidden = true;

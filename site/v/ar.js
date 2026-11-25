@@ -106,7 +106,10 @@ async function start() {
     failed = true;
     tell('立体の読み込みに失敗しました。「作品に戻る」からもう一度開いてください。');
   });
-  marker.append(model);
+  // Face the printed card's reader after centering the TripoSR mesh on its stand.
+  const facingReader = element('a-entity', { rotation: '0 180 0' });
+  facingReader.append(model);
+  marker.append(facingReader);
   scene.append(marker);
   scene.append(element('a-light', { type: 'ambient', color: '#ffffff', intensity: '1' }));
   scene.append(element('a-light', { type: 'directional', intensity: '0.65', position: '1 3 2' }));
