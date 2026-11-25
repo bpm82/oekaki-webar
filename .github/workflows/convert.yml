@@ -1,0 +1,101 @@
+name: Drawings to 3D
+on:
+  push:
+    branches: [main]
+    paths: ['drawings/**', 'scripts/convert.py', 'scripts/slots.py', 'scripts/requirements-cpu.txt', '.github/workflows/convert.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: convert-all-drawings
+  cancel-in-progress: false
+
+jobs:
+  convert:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      WEIGHTS_REF: 5b521936b01fbe1890f6f9baed0254ab6351c04a
+      HF_HUB_DISABLE_XET: '1'
+      OMP_NUM_THREADS: '4'
+      MKL_NUM_THREADS: '4'
+      PYTHONPATH: ${{ github.workspace }}/.engine
+      MODEL_STORE: ${{ github.workspace }}/.model-store
+      RETRY: ${{ github.event_name == 'workflow_dispatch' && '--retry' || '' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        id: python
+        with:
+          python-version: '3.11'
+      - name: Open the generated models branch
+        run: |
+          git init -q -b models "$MODEL_STORE"
+          git -C "$MODEL_STORE" remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          refs=$(git -C "$MODEL_STORE" ls-remote --heads origin refs/heads/models)
+          if [[ -n "$refs" ]]; then
+            git -C "$MODEL_STORE" fetch --quiet --depth=1 origin refs/heads/models
+            git -C "$MODEL_STORE" checkout --quiet -B models FETCH_HEAD
+          fi
+      - name: Find new or replaced PNG files
+        id: scan
+        run: python scripts/convert.py scan "$MODEL_STORE/assets" $RETRY
+      - name: Check out TripoSR
+        if: steps.scan.outputs.pending == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: VAST-AI-Research/TripoSR
+          ref: 107cefdc244c39106fa830359024f6a2f1c78871
+          path: .engine
+          persist-credentials: false
+      - name: Restore CPU environment
+        if: steps.scan.outputs.pending == 'true'
+        id: packages
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: cpu-ubuntu24-v1-${{ steps.python.outputs.python-version }}-${{ hashFiles('scripts/requirements-cpu.txt', '.github/workflows/convert.yml') }}
+      - name: Restore model weights
+        if: steps.scan.outputs.pending == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface/hub
+            ~/.u2net
+          key: triposr-${{ env.WEIGHTS_REF }}-u2netp-v1
+      - name: Install CPU-only dependencies
+        if: steps.scan.outputs.pending == 'true' && steps.packages.outputs.cache-hit != 'true'
+        env:
+          CMAKE_BUILD_PARALLEL_LEVEL: '1'
+          CMAKE_ARGS: -DCMAKE_CUDA_COMPILER=NOTFOUND
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r scripts/requirements-cpu.txt
+          export CMAKE_PREFIX_PATH="$(python -c 'import torch; print(torch.utils.cmake_prefix_path)')"
+          python -m pip install --no-build-isolation 'git+https://github.com/tatsy/torchmcubes.git@3381600ddc3d2e4d74222f8495866be5fafbace4'
+          python -m pip check
+      - name: Reconstruct drawings on the hosted CPU
+        if: steps.scan.outputs.pending == 'true'
+        run: .venv/bin/python scripts/convert.py generate "$MODEL_STORE/assets" $RETRY
+      - name: Mark any unfinished drawings for staff attention
+        if: failure() && steps.scan.outputs.pending == 'true'
+        run: python scripts/convert.py mark-failures "$MODEL_STORE/assets"
+      - name: Save models and generation status
+        if: '!cancelled() && steps.scan.outputs.pending == ''true'''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ env.MODEL_STORE }}
+        run: |
+          git add -- assets
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Update numbered 3D models'
+          gh auth setup-git
+          git push origin HEAD:refs/heads/models
