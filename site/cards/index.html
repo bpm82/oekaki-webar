@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>カード印刷 | おえかき立体工房</title>
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <a class="brand" href="../"
+        ><span class="brand-mark" aria-hidden="true"></span>おえかき立体工房</a
+      >
+    </header>
+    <main class="wrap">
+      <section class="card-panel">
+        <div class="no-print">
+          <h1>作品カードを印刷</h1>
+          <p>使う番号を選んで、黒い枠ごと印刷してください。絵が届く前に用意できます。</p>
+          <form id="controls" class="card-controls">
+            <label
+              >最初の番号<input
+                type="number"
+                class="number-input"
+                id="first"
+                min="1"
+                max="100"
+                value="1"
+                required /></label
+            ><label
+              >最後の番号<input
+                type="number"
+                class="number-input"
+                id="last"
+                min="1"
+                max="100"
+                value="1"
+                required /></label
+            ><button class="primary" type="submit">印刷する</button>
+          </form>
+        </div>
+        <div id="cards" class="card-stack"></div>
+        <p id="error" class="feedback" role="status"></p>
+      </section>
+    </main>
+    <script type="module" src="./print.js"></script>
+  </body>
+</html>

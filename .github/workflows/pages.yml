@@ -1,0 +1,59 @@
+name: Publish workshop
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', 'scripts/build_site.py', 'scripts/cards.mjs', 'scripts/vendor/**', 'scripts/slots.py', 'drawings/**', '.github/workflows/pages.yml']
+  workflow_run:
+    workflows: ['Drawings to 3D']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-latest-workshop
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Read the current generated models
+        run: |
+          refs=$(git ls-remote --heads origin refs/heads/models)
+          if [[ -n "$refs" ]]; then
+            git clone --quiet --depth=1 --branch=models "https://github.com/$GITHUB_REPOSITORY.git" "$RUNNER_TEMP/models"
+          fi
+      - name: Assemble drawings, models and fixed cards
+        run: |
+          python3 scripts/build_site.py "$RUNNER_TEMP/models/assets" public
+          node scripts/cards.mjs "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/" public
+      - name: Bundle the AR viewer libraries on the same site
+        run: |
+          mkdir -p public/vendor
+          curl -fsSL --retry 3 'https://aframe.io/releases/1.4.0/aframe.min.js' -o public/vendor/aframe.js
+          curl -fsSL --retry 3 'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js' -o public/vendor/aframe-ar.js
+          curl -fsSL --retry 3 'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/data/data/camera_para.dat' -o public/vendor/camera_para.dat
+          curl -fsSL --retry 3 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js' -o public/vendor/model-viewer.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+  deploy:
+    runs-on: ubuntu-24.04
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: publish

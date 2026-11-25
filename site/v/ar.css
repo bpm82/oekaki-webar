@@ -1,0 +1,40 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font:
+    100%/1.5 'Yu Gothic',
+    Meiryo,
+    sans-serif;
+}
+.overlay {
+  position: fixed;
+  z-index: 20;
+  top: max(12px, env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+}
+.overlay a,
+.overlay p {
+  margin: 0;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  background: #12352eed;
+  color: white;
+}
+.overlay a {
+  pointer-events: auto;
+  flex: none;
+  text-underline-offset: 0.2em;
+}
+.overlay p {
+  max-width: 30rem;
+  font-size: 0.9rem;
+}
