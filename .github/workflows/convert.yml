@@ -39,12 +39,22 @@ jobs:
       - name: Find new or replaced PNG files
         id: scan
         run: python scripts/convert.py scan assets $RETRY
+      - name: Cache the Blender release archive
+        if: steps.scan.outputs.baking == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/blender-4.3.2-linux-x64.tar.xz
+          key: blender-4.3.2-linux-x64-4da1c956
       - name: Install CPU texture baker
         if: steps.scan.outputs.baking == 'true'
         run: |
           cd "$RUNNER_TEMP"
           archive=blender-4.3.2-linux-x64.tar.xz
-          curl --fail --silent --show-error --location --retry 3 "https://download.blender.org/release/Blender4.3/$archive" -o "$archive"
+          if [[ ! -s "$archive" ]]; then
+            for mirror in https://mirror.blender.org https://mirror.clarkson.edu/blender https://ftp.halifax.rwth-aachen.de/blender; do
+              if curl -fsSL --connect-timeout 10 --max-time 180 "$mirror/release/Blender4.3/$archive" -o "$archive"; then break; fi
+            done
+          fi
           echo "4da1c956673c0485e63054e563ee69198cc8f80d8157dd7592dffc8a6a5592e6  $archive" | sha256sum --check
           tar -xf "$archive"
           echo "BLENDER_BIN=$RUNNER_TEMP/blender-4.3.2-linux-x64/blender" >> "$GITHUB_ENV"
