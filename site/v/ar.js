@@ -83,7 +83,11 @@ async function start() {
   });
   model.addEventListener('model-loaded', (event) => {
     const mesh = event.detail.model;
+    // TripoSR's illustrated front is -Z. On an AR.js card +Y faces the reader
+    // and -Z points towards the top edge of the printed QR.
+    model.object3D.rotation.set(-Math.PI / 2, Math.PI, 0, 'XYZ');
     const bounds = new THREE.Box3().setFromObject(mesh.clone());
+    bounds.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(model.object3D.rotation));
     const center = bounds.getCenter(new THREE.Vector3()),
       size = bounds.getSize(new THREE.Vector3());
     const scale = 1.25 / Math.max(size.x, size.y, size.z, 0.001);
@@ -106,10 +110,7 @@ async function start() {
     failed = true;
     tell('立体の読み込みに失敗しました。「作品に戻る」からもう一度開いてください。');
   });
-  // Face the printed card's reader after centering the TripoSR mesh on its stand.
-  const facingReader = element('a-entity', { rotation: '0 180 0' });
-  facingReader.append(model);
-  marker.append(facingReader);
+  marker.append(model);
   scene.append(marker);
   scene.append(element('a-light', { type: 'ambient', color: '#ffffff', intensity: '1' }));
   scene.append(element('a-light', { type: 'directional', intensity: '0.65', position: '1 3 2' }));
