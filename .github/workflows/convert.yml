@@ -43,7 +43,7 @@ jobs:
         if: steps.scan.outputs.baking == 'true'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends blender
+          sudo apt-get install -y --no-install-recommends blender python3-numpy
       - name: Check out TripoSR
         if: steps.scan.outputs.pending == 'true'
         uses: actions/checkout@v6
