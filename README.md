@@ -20,7 +20,7 @@
 
 番号フォルダのGLBをダウンロードし、UnityのPackage Managerで **glTFast**（`com.unity.cloud.gltfast`）を追加したプロジェクトの `Assets` に入れます。インポートされたモデルをシーンに置くと、マテリアルに割り当てられた作品の色を使えます。[Unity公式のインポート手順](https://github.com/Unity-Technologies/com.unity.cloud.gltfast/blob/main/Packages/com.unity.cloud.gltfast/Documentation~/ImportEditor.md)
 
-GitHub ActionsがモデルのUVを展開し、頂点カラーを1024×1024のベースカラーテクスチャに焼き込みます。PNGとマテリアルはGLBに内蔵されるので、持ち出すファイルはGLBひとつです。
+GitHub ActionsがモデルのUVを展開し、頂点カラーを1024×1024のベースカラーテクスチャに焼き込みます。保存前に、完成したGLBからPNGを読み戻し、メッシュの表面で元の色と照合します。PNGとマテリアルはGLBに内蔵されるので、持ち出すファイルはGLBひとつです。
 
 ## 店での流れ
 

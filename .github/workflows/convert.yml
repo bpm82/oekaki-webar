@@ -2,7 +2,7 @@ name: Drawings to 3D
 on:
   push:
     branches: [main]
-    paths: ['assets/*/drawing.png', 'assets/*/*.glb', 'assets/*/status.json', 'drawings/**', 'scripts/convert.py', 'scripts/slots.py', 'scripts/bake_colors.py', 'scripts/texture.py', 'scripts/requirements-cpu.txt', '.github/workflows/convert.yml']
+    paths: ['assets/*/drawing.png', 'assets/*/*.glb', 'assets/*/status.json', 'drawings/**', 'scripts/convert.py', 'scripts/slots.py', 'scripts/bake_colors.py', 'scripts/texture.py', 'scripts/check_baked_color.py', 'scripts/requirements-cpu.txt', '.github/workflows/convert.yml']
   workflow_dispatch:
 
 permissions:
@@ -42,8 +42,15 @@ jobs:
       - name: Install CPU texture baker
         if: steps.scan.outputs.baking == 'true'
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends blender python3-numpy
+          cd "$RUNNER_TEMP"
+          archive=blender-4.3.2-linux-x64.tar.xz
+          curl --fail --silent --show-error --location --retry 3 "https://download.blender.org/release/Blender4.3/$archive" -o "$archive"
+          echo "4da1c956673c0485e63054e563ee69198cc8f80d8157dd7592dffc8a6a5592e6  $archive" | sha256sum --check
+          tar -xf "$archive"
+          echo "BLENDER_BIN=$RUNNER_TEMP/blender-4.3.2-linux-x64/blender" >> "$GITHUB_ENV"
+      - name: Install texture verification dependencies for existing models
+        if: steps.scan.outputs.baking == 'true' && steps.scan.outputs.pending != 'true'
+        run: python -m pip install numpy==1.26.4 Pillow==11.3.0
       - name: Check out TripoSR
         if: steps.scan.outputs.pending == 'true'
         uses: actions/checkout@v6

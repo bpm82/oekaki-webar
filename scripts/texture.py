@@ -4,6 +4,7 @@ import struct
 import subprocess
 import tempfile
 from pathlib import Path
+from check_baked_color import verify_bake
 
 
 def has_baked_color(path):
@@ -46,4 +47,5 @@ def bake_color_glb(raw, destination):
                         str(output.resolve())], check=True)
         if not has_baked_color(output) or output.stat().st_size > 80 * 1024 * 1024:
             raise ValueError("有効なテクスチャ付きGLBを作成できませんでした。")
+        verify_bake(raw, output.read_bytes())
         output.replace(destination)
