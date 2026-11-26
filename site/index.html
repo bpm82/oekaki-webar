@@ -10,7 +10,7 @@
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <title>おえかき立体工房</title>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=5" />
   </head>
   <body>
     <header class="bar">
@@ -36,6 +36,9 @@
           </div>
           <fieldset id="tools" class="toolbox">
             <legend class="sr">お絵かき道具</legend>
+            <button type="button" id="choose-template" aria-haspopup="dialog" aria-controls="templates">
+              テンプレートを選ぶ
+            </button>
             <div>
               <h2>色を選ぶ</h2>
               <div id="palette" class="palette" role="group" aria-label="ペンの色"></div>
@@ -80,6 +83,16 @@
         </div>
       </section>
     </main>
+    <dialog id="templates" aria-labelledby="template-title">
+      <div class="template-heading">
+        <h2 id="template-title">テンプレートを選ぶ</h2>
+        <button type="button" id="close-templates">閉じる</button>
+      </div>
+      <p id="template-help" class="small" hidden>
+        選ぶと今の絵が置き換わります。「ひとつ戻す」で元の絵に戻れます。
+      </p>
+      <div id="template-options" class="template-options"></div>
+    </dialog>
     <dialog id="settings">
       <form id="settings-form">
         <h2>店頭端末の設定</h2>
@@ -116,6 +129,6 @@
         </div>
       </form>
     </dialog>
-    <script src="studio.js?v=4" type="module"></script>
+    <script src="studio.js?v=5" type="module"></script>
   </body>
 </html>

@@ -7,6 +7,7 @@ import {
   releaseCard,
   renewBefore,
 } from './upload.js?v=4';
+import { drawTemplate, drawingTemplates } from './drawing-templates.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('sheet');
@@ -110,6 +111,34 @@ function remember() {
 function pickTool(name) {
   tool = name;
   for (const id of ['pen', 'bucket', 'eraser']) $(id).setAttribute('aria-pressed', id === name);
+}
+const templateDialog = $('templates');
+$('choose-template').onclick = () => {
+  if (busy || pointer !== null) return;
+  $('template-help').hidden = !hasInk;
+  templateDialog.showModal();
+};
+$('close-templates').onclick = () => templateDialog.close();
+for (const template of drawingTemplates) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'template-option';
+  const preview = document.createElement('canvas');
+  preview.width = preview.height = 160;
+  preview.setAttribute('aria-hidden', 'true');
+  drawTemplate(preview, template);
+  button.append(preview, template.name);
+  button.onclick = () => {
+    if (busy || pointer !== null) return;
+    remember();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawTemplate(canvas, template);
+    pickTool('bucket');
+    templateDialog.close();
+    refresh();
+    drawingActivity();
+  };
+  $('template-options').append(button);
 }
 for (const id of ['pen', 'bucket', 'eraser']) $(id).onclick = () => pickTool(id);
 for (const [name, label] of colors) {

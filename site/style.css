@@ -233,6 +233,11 @@ canvas#sheet {
 .toolbox[disabled] {
   opacity: 0.72;
 }
+#choose-template {
+  grid-column: 1 / -1;
+  background: #edf5ee;
+  color: var(--green);
+}
 .palette {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -395,6 +400,38 @@ dialog h2 {
 }
 dialog p {
   margin-bottom: 0.6rem;
+}
+#templates {
+  width: min(560px, calc(100% - 1.5rem));
+  padding: clamp(0.75rem, 3vw, 1.4rem);
+}
+.template-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin-bottom: 0.8rem;
+}
+.template-heading h2 {
+  margin: 0;
+  font-size: clamp(1rem, 4vw, 1.45rem);
+}
+.template-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  gap: 0.55rem;
+}
+.template-option {
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  font-size: 0.86rem;
+}
+.template-option canvas {
+  display: block;
+  width: min(100%, 7rem);
+  height: auto;
 }
 dialog input,
 select,
