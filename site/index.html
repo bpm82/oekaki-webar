@@ -25,6 +25,7 @@
         <div class="intro">
           <h1>絵を描いて、<em>立体にしよう。</em></h1>
           <p>動物や好きなものを、ひとつ大きく描いてみてね。</p>
+          <p id="card-status" role="status">端末設定を済ませると、描き始めにカード番号が決まります。</p>
         </div>
         <div class="workbench">
           <div class="canvas-frame">
@@ -82,7 +83,7 @@
     <dialog id="settings">
       <form id="settings-form">
         <h2>店頭端末の設定</h2>
-        <p>スタッフが開始時に一度設定すると、このタブで「完成」から送信できます。</p>
+        <p>自動なら最初のひと筆かPNGの読み込みで、番号を指定したら設定の保存時に確保します。</p>
         <label class="form-label" for="token">このリポジトリ専用のGitHubトークン</label>
         <input
           id="token"
@@ -106,14 +107,15 @@
         </select>
         <p id="availability" role="status" class="small"></p>
         <button type="button" id="reload-slots" class="text-button">空き状況を更新</button>
+        <p class="small">予約は1時間で、描き続けると延長されます。</p>
         <p id="connection" role="status" class="small"></p>
         <div class="actions">
           <button class="primary" type="submit">設定を保存</button
           ><button type="button" id="close">閉じる</button
-          ><button class="text-button" type="button" id="disconnect" hidden>接続を解除</button>
+          ><button class="text-button" type="button" id="disconnect" hidden>接続を解除して番号を返す</button>
         </div>
       </form>
     </dialog>
-    <script src="studio.js?v=3" type="module"></script>
+    <script src="studio.js?v=4" type="module"></script>
   </body>
 </html>

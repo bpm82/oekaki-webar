@@ -1,4 +1,12 @@
-import { slotIds, occupiedSlots, prepareUpload, submitDrawing } from './upload.js?v=3';
+import {
+  slotIds,
+  cardInventory,
+  prepareUpload,
+  submitDrawing,
+  reserveCard,
+  releaseCard,
+  renewBefore,
+} from './upload.js?v=4';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('sheet');
@@ -24,6 +32,57 @@ let color,
   upload = null;
 let hasInk = false,
   busy = false;
+let owner = crypto.randomUUID();
+let lease = null,
+  acquiring = null,
+  retryAfter = 0,
+  expiryTimer,
+  editingSettings = false;
+
+function cardStatus(message) {
+  $('card-status').textContent = message;
+}
+function claim(key, slot) {
+  if (acquiring) return acquiring;
+  $('setup').disabled = true;
+  cardStatus('カード番号を確認しています…');
+  acquiring = reserveCard(key, owner, slot)
+    .then((result) => {
+      lease = result;
+      clearTimeout(expiryTimer);
+      cardStatus(lease.slot + '番で描いています。このカードを使えます。');
+      expiryTimer = setTimeout(
+        () => cardStatus(lease.slot + '番の予約期限を迎えました。次の操作で空きを確認します。'),
+        Math.max(0, lease.expires - Date.now()),
+      );
+      return lease;
+    })
+    .catch((error) => {
+      retryAfter = Date.now() + 15000;
+      cardStatus(
+        (error instanceof TypeError ? '通信を確認してください。' : error.message) +
+          ' 絵はこの画面に残ります。',
+      );
+      throw error;
+    })
+    .finally(() => {
+      acquiring = null;
+      $('setup').disabled = busy;
+    });
+  return acquiring;
+}
+function drawingActivity() {
+  if (!token || acquiring || busy || Date.now() < retryAfter) return;
+  if (lease && lease.expires - Date.now() > renewBefore) return;
+  claim(token, preferred || lease?.slot || '').catch(() => {});
+}
+function forgetCard() {
+  clearTimeout(expiryTimer);
+  owner = crypto.randomUUID();
+  lease = null;
+  preferred = '';
+  retryAfter = 0;
+}
 
 function say(message) {
   $('feedback').textContent = message;
@@ -128,6 +187,7 @@ function fillAt([px, py]) {
   for (let i = 0; i < tail; i++) data.set(after, queue[i] * 4);
   ctx.putImageData(frame, 0, 0);
   refresh();
+  if (hasInk) drawingActivity();
 }
 canvas.onpointerdown = (event) => {
   if (busy || pointer !== null || event.button !== 0) return;
@@ -141,6 +201,7 @@ canvas.onpointerdown = (event) => {
   canvas.setPointerCapture(pointer);
   lastPoint = point(event);
   stroke(lastPoint, lastPoint);
+  if (tool !== 'eraser' || hasInk) drawingActivity();
   $('hint').hidden = true;
 };
 canvas.onpointermove = (event) => {
@@ -179,6 +240,7 @@ $('import').onchange = async (event) => {
       h = image.height * scale;
     ctx.drawImage(image, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
     refresh();
+    if (hasInk) drawingActivity();
   } catch (error) {
     say(error.message);
   } finally {
@@ -197,41 +259,51 @@ $('download').onclick = async () => {
   const url = URL.createObjectURL(await png());
   const a = document.createElement('a');
   a.href = url;
-  a.download = (preferred || 'drawing') + '.png';
+  a.download = (lease?.slot || preferred || 'drawing') + '.png';
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 };
 const slotSelect = $('slot');
 for (const id of slotIds) slotSelect.add(new Option(id + '番', id));
 let inventoryRequest = 0;
-function renderSlots(used) {
+function renderSlots(inventory) {
   for (const option of slotSelect.options) {
     if (!option.value) continue;
-    const unavailable = used?.has(option.value);
-    option.disabled = !used || unavailable;
-    option.text = option.value + '番' + (!used ? '（未確認）' : unavailable ? '（使用済み）' : '');
+    const id = option.value;
+    const card = inventory?.cards[id];
+    const active = card?.expires > Date.now();
+    let label = '';
+    if (!inventory) label = '（未確認）';
+    else if (inventory.used.has(id)) label = '（使用済み）';
+    else if (active) label = card.owner === owner ? '（この端末で描画中）' : '（描画中）';
+    option.disabled = !inventory || inventory.used.has(id) || (active && card.owner !== owner);
+    option.text = id + '番' + label;
   }
 }
 async function refreshSlots() {
   const request = ++inventoryRequest;
   const status = $('availability');
   $('reload-slots').disabled = true;
-  renderSlots(null);
   status.textContent = 'カードの空き状況を確認しています…';
   try {
-    const used = await occupiedSlots($('token').value.trim() || token);
+    const inventory = await cardInventory($('token').value.trim() || token);
     if (request !== inventoryRequest) return;
-    renderSlots(used);
-    if (used.has(slotSelect.value)) {
-      status.textContent = slotSelect.value + '番は使用済みです。ほかの番号を選んでください。';
-    } else if (used.size === slotIds.length) {
-      status.textContent = 'すべての番号が使用済みです。';
+    renderSlots(inventory);
+    const free = slotIds.filter(
+      (id) => !inventory.used.has(id) && !(inventory.cards[id]?.expires > Date.now()),
+    ).length;
+    if (slotSelect.selectedOptions[0]?.disabled) {
+      status.textContent =
+        slotSelect.selectedOptions[0].text + 'です。ほかの番号を選んでください。';
     } else {
-      status.textContent = '空きは' + (slotIds.length - used.size) + '枚です。番号は送信時に確定します。';
+      status.textContent = '空きは' + free + '枚です。';
     }
   } catch {
-    if (request === inventoryRequest)
-      status.textContent = '空き状況を取得できませんでした。通信とトークンを確認して更新してください。';
+    if (request === inventoryRequest) {
+      renderSlots(null);
+      status.textContent =
+        '空き状況を取得できませんでした。通信とトークンを確認して更新してください。';
+    }
   } finally {
     if (request === inventoryRequest) $('reload-slots').disabled = false;
   }
@@ -243,23 +315,45 @@ function openSettings() {
     : '送信するにはスタッフの設定が必要です。';
   $('slot').value = preferred;
   $('disconnect').hidden = !token;
+  renderSlots(null);
   settings.showModal();
   refreshSlots();
 }
 $('setup').onclick = openSettings;
 $('close').onclick = () => settings.close();
+settings.addEventListener('cancel', (event) => {
+  if (editingSettings) event.preventDefault();
+});
+setInterval(() => {
+  if (settings.open && !document.hidden && !editingSettings && !$('reload-slots').disabled)
+    refreshSlots();
+}, 30000);
 settings.addEventListener('close', () => {
   inventoryRequest++;
   $('token').value = '';
 });
-$('disconnect').onclick = () => {
-  token = '';
-  preferred = '';
-  settings.close();
-  say('このタブの接続を解除しました。');
+function lockSettings(locked) {
+  editingSettings = locked;
+  for (const control of $('settings-form').elements) control.disabled = locked;
+}
+$('disconnect').onclick = async () => {
+  lockSettings(true);
+  try {
+    await releaseCard(token, owner);
+    forgetCard();
+    token = '';
+    settings.close();
+    cardStatus('カード番号を確保するには端末設定が必要です。');
+    say('このタブの接続を解除しました。');
+  } catch (error) {
+    $('connection').textContent = error.message;
+  } finally {
+    lockSettings(false);
+  }
 };
-$('settings-form').onsubmit = (e) => {
+$('settings-form').onsubmit = async (e) => {
   e.preventDefault();
+  if (editingSettings) return;
   const next = $('token').value.trim() || token;
   if (!next) {
     $('connection').textContent = 'トークンを入力してください。';
@@ -271,10 +365,21 @@ $('settings-form').onsubmit = (e) => {
     slotSelect.focus();
     return;
   }
-  token = next;
-  preferred = $('slot').value;
-  settings.close();
-  say('端末を設定しました。絵ができたら「完成」を押してください。');
+  const selection = slotSelect.value;
+  lockSettings(true);
+  try {
+    if (hasInk || lease || selection) await claim(next, selection);
+    else cardStatus('描き始めると、空いているカード番号を確保します。');
+    token = next;
+    preferred = selection;
+    settings.close();
+    say('端末を設定しました。');
+  } catch (error) {
+    $('connection').textContent = error.message;
+    await refreshSlots();
+  } finally {
+    lockSettings(false);
+  }
 };
 $('send').onclick = async () => {
   if (busy || !hasInk) return;
@@ -287,8 +392,11 @@ $('send').onclick = async () => {
   $('setup').disabled = true;
   say('絵を送信しています…');
   try {
+    if (acquiring) await acquiring;
+    if (!lease) await claim(token, preferred);
     upload ??= await prepareUpload(await png());
-    const id = await submitDrawing(token, upload, preferred);
+    const id = await submitDrawing(token, upload, owner, lease.slot);
+    clearTimeout(expiryTimer);
     $('assigned').textContent = id;
     $('view-link').href = 'v/?id=' + id;
     $('studio').hidden = true;
@@ -303,7 +411,7 @@ $('send').onclick = async () => {
   } finally {
     busy = false;
     $('tools').disabled = false;
-    $('setup').disabled = false;
+    $('setup').disabled = !$('receipt').hidden;
     refresh();
   }
 };
@@ -311,10 +419,12 @@ $('next').onclick = () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   history.length = 0;
   upload = null;
-  preferred = '';
+  forgetCard();
+  cardStatus('描き始めると、空いているカード番号を確保します。');
   say('');
   refresh();
   $('receipt').hidden = true;
+  $('setup').disabled = false;
   $('studio').hidden = false;
   pickTool('pen');
 };

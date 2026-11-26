@@ -1,94 +1,170 @@
 const repository = 'https://api.github.com/repos/bpm82/oekaki-webar';
+const registry = 'reservations/cards.json';
+const hour = 60 * 60 * 1000;
+export const renewBefore = hour / 2;
 export const slotIds = Array.from({ length: 100 }, (_, i) => String(i + 1).padStart(2, '0'));
 
-function drawingUrl(slot) {
-  return repository + '/contents/assets/' + slot + '/drawing.png';
-}
-
-function auth(key) {
-  return {
-    ...(key ? { Authorization: 'Bearer ' + key } : {}),
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
-}
-
-function apiError(response) {
-  if ([401, 403, 404].includes(response.status))
-    return new Error('端末設定で、このリポジトリの Contents に書き込めるトークンを確認してください。');
-  if (response.status === 429)
-    return new Error('送信が混み合っています。少し待ってから、もう一度押してください。');
-  return new Error(
-    'GitHubへの送信に失敗しました（' + response.status + '）。絵はこの画面に残っています。',
-  );
-}
-
-async function fileSha(key, slot) {
-  const response = await fetch(drawingUrl(slot) + '?ref=main', {
-    headers: auth(key),
+async function api(key, path, method = 'GET', body) {
+  const response = await fetch(repository + path, {
+    method,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(key ? { Authorization: 'Bearer ' + key } : {}),
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
     cache: 'no-store',
+    body: body ? JSON.stringify(body) : undefined,
   });
-  if (response.status === 404) return null;
-  if (!response.ok) throw apiError(response);
-  return (await response.json()).sha;
+  if (!response.ok) {
+    const message = [401, 403, 404].includes(response.status)
+      ? '通信と、このリポジトリの Contents に書き込めるトークンを確認してください。'
+      : 'GitHubに接続できませんでした（' + response.status + '）。もう一度お試しください。';
+    throw Object.assign(new Error(message), { status: response.status });
+  }
+  return response.json();
+}
+
+export async function cardInventory(key) {
+  const { commit } = await api(key, '/branches/main');
+  const root = commit.commit.tree.sha;
+  const { tree, truncated } = await api(key, '/git/trees/' + root + '?recursive=1');
+  if (truncated || !Array.isArray(tree))
+    throw new Error('カードの空き状況をすべて確認できませんでした。');
+  const files = new Map(tree.map(({ path, sha }) => [path, sha]));
+  const used = new Map();
+  for (const id of slotIds) {
+    const sha = files.get('assets/' + id + '/drawing.png') || files.get('drawings/' + id + '.png');
+    if (sha) used.set(id, sha);
+  }
+  let cards = {};
+  if (files.has(registry)) {
+    const blob = await api(key, '/git/blobs/' + files.get(registry));
+    cards = JSON.parse(atob(blob.content));
+    if (
+      !cards ||
+      Array.isArray(cards) ||
+      typeof cards !== 'object' ||
+      !Object.entries(cards).every(
+        ([id, card]) =>
+          slotIds.includes(id) &&
+          card &&
+          typeof card.owner === 'string' &&
+          (Number.isFinite(card.expires) || typeof card.drawing === 'string'),
+      )
+    )
+      throw new Error('カードの予約状況を読み取れませんでした。スタッフにお知らせください。');
+  }
+  return { head: commit.sha, root, used, cards };
+}
+
+// Publish the drawing and its registry change together, only against the snapshot we checked.
+async function updateCards(key, change) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const state = await cardInventory(key);
+    const { message, result, files = [] } = change(state);
+    if (!message) return result;
+    const tree = await api(key, '/git/trees', 'POST', {
+      base_tree: state.root,
+      tree: [
+        {
+          path: registry,
+          mode: '100644',
+          type: 'blob',
+          content: JSON.stringify(state.cards, null, 2) + '\n',
+        },
+        ...files,
+      ],
+    });
+    const commit = await api(key, '/git/commits', 'POST', {
+      message,
+      tree: tree.sha,
+      parents: [state.head],
+    });
+    try {
+      await api(key, '/git/refs/heads/main', 'PATCH', { sha: commit.sha, force: false });
+      return result;
+    } catch (error) {
+      if (error.status !== 409 && error.status !== 422) throw error;
+      // Another station or the converter advanced main. Re-evaluate availability on the new head.
+      await new Promise((resolve) =>
+        setTimeout(resolve, 100 + Math.random() * 180 * (attempt + 1)),
+      );
+    }
+  }
+  throw new Error('ほかの端末が受付中です。少し待ってから、もう一度お試しください。');
+}
+
+export function reserveCard(key, owner, preferred = '') {
+  return updateCards(key, ({ used, cards }) => {
+    const now = Date.now();
+    const received = slotIds.find(
+      (id) => cards[id]?.owner === owner && cards[id].drawing && used.has(id),
+    );
+    if (received)
+      throw new Error(
+        received + '番はこの絵を受付済みです。「完成」をもう一度押して確認してください。',
+      );
+    const owned = slotIds.find(
+      (id) => cards[id]?.owner === owner && cards[id].expires && !used.has(id),
+    );
+    const available = (id) =>
+      !used.has(id) && !(cards[id]?.expires > now && cards[id].owner !== owner);
+    const slot = preferred || owned || slotIds.find(available);
+    if (!slot) throw new Error('すべての番号が使用済みか描画中です。');
+    if (!slotIds.includes(slot) || !available(slot)) {
+      const status = used.has(slot) ? '使用済み' : 'ほかの端末で描画中';
+      throw new Error(slot + '番は' + status + 'です。端末設定で空いている番号を選んでください。');
+    }
+    if (owned === slot && cards[slot].expires - now > renewBefore)
+      return { result: { slot, expires: cards[slot].expires } };
+    if (owned) delete cards[owned];
+    const expires = now + hour;
+    cards[slot] = { owner, expires };
+    return { message: 'Reserve card ' + slot, result: { slot, expires } };
+  });
+}
+
+export function releaseCard(key, owner) {
+  return updateCards(key, ({ cards }) => {
+    const id = slotIds.find((id) => cards[id]?.owner === owner && cards[id].expires);
+    if (!id) return {};
+    delete cards[id];
+    return { message: 'Release card ' + id };
+  });
 }
 
 export async function prepareUpload(blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
-  const head = new TextEncoder().encode('blob ' + bytes.length + '\0');
-  const object = new Uint8Array(head.length + bytes.length);
-  object.set(head);
-  object.set(bytes, head.length);
-  const hash = await crypto.subtle.digest('SHA-1', object);
-  const sha = Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
   let binary = '';
-  for (let i = 0; i < bytes.length; i += 8192) {
+  for (let i = 0; i < bytes.length; i += 8192)
     binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  }
-  return { content: btoa(binary), sha, attempted: null };
+  return { content: btoa(binary) };
 }
 
-export async function occupiedSlots(key) {
-  const response = await fetch(repository + '/git/trees/main?recursive=1', {
-    headers: auth(key),
-    cache: 'no-store',
-  });
-  if (!response.ok) throw apiError(response);
-  const { tree, truncated } = await response.json();
-  if (truncated || !Array.isArray(tree))
-    throw new Error('カードの空き状況をすべて確認できませんでした。');
-  const paths = new Set(tree.map((entry) => entry.path));
-  return new Set(
-    slotIds.filter((id) => paths.has('assets/' + id + '/drawing.png') || paths.has('drawings/' + id + '.png')),
-  );
-}
-
-export async function submitDrawing(key, upload, preferred) {
-  const headers = auth(key);
-  for (let attempt = 0; attempt < 6; attempt++) {
-    // An interrupted PUT may already have committed. Reconcile it before assigning a second card.
-    if (upload.attempted && (await fileSha(key, upload.attempted)) === upload.sha)
-      return upload.attempted;
-    const used = await occupiedSlots(key);
-    if (preferred && used.has(preferred))
-      throw new Error(preferred + '番は使用中です。端末設定で空き番号を選んでください。');
-    const slot = preferred || slotIds.find((id) => !used.has(id));
-    if (!slot) throw new Error('100枚のカードをすべて使用しました。スタッフにお知らせください。');
-    upload.attempted = slot;
-    const response = await fetch(drawingUrl(slot), {
-      method: 'PUT',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: 'Receive drawing ' + slot,
-        content: upload.content,
-        branch: 'main',
-      }),
+export async function submitDrawing(key, upload, owner, slot) {
+  if (!upload.sha) {
+    const blob = await api(key, '/git/blobs', 'POST', {
+      content: upload.content,
+      encoding: 'base64',
     });
-    if (response.status === 201) return slot;
-    if (response.status !== 409 && response.status !== 422) throw apiError(response);
-    // The API rejects a create if another station has taken the path. No update SHA is sent.
-    upload.attempted = null;
-    if (response.status === 422 && !(await fileSha(key, slot))) throw apiError(response);
+    upload.sha = blob.sha;
   }
-  throw new Error('ほかの端末が送信中です。少し待ってからもう一度押してください。');
+  return updateCards(key, ({ used, cards }) => {
+    const card = cards[slot];
+    if (card?.owner === owner && card.drawing === upload.sha && used.get(slot) === upload.sha)
+      return { result: slot }; // The previous submission succeeded but its reply was lost.
+    if (used.has(slot) || card?.owner !== owner || !card?.expires)
+      throw new Error(
+        slot + '番を使用できません。絵は残っています。端末設定で空き番号を選んでください。',
+      );
+    cards[slot] = { owner, drawing: upload.sha };
+    return {
+      message: 'Receive drawing ' + slot,
+      files: [
+        { path: 'assets/' + slot + '/drawing.png', mode: '100644', type: 'blob', sha: upload.sha },
+      ],
+      result: slot,
+    };
+  });
 }

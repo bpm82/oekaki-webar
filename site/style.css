@@ -178,6 +178,11 @@ h2,
 .intro p {
   margin-bottom: 0;
 }
+#card-status {
+  color: var(--green);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(235px, 0.53fr);
