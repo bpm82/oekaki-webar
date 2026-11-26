@@ -49,7 +49,7 @@ async function start() {
     smooth: 'true',
   });
   const model = element('a-entity', {
-    'gltf-model': new URL(asset(slot + '.glb', work.source), location.href).href,
+    'gltf-model': new URL(asset(slot + '.glb', work.modelVersion || work.source), location.href).href,
   });
   let found = false;
   let loaded = false;

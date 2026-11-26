@@ -3,7 +3,7 @@ import json
 import shutil
 from pathlib import Path
 
-from slots import ASSETS, SLOTS, drawings, read_status
+from slots import ASSETS, SLOTS, drawings, read_status, source_digest
 
 
 def skip_managed_files(directory, names):
@@ -28,13 +28,16 @@ def build(output):
             is_png = stream.read(8) == b"\x89PNG\r\n\x1a\n"
         if is_png:
             shutil.copyfile(image, target / "drawing.png")
+        entry = {"source": digest, "preview": is_png}
         if state == "ready":
             model = source / f"{slot}.glb"
             if model.is_file() and not model.is_symlink():
                 shutil.copyfile(model, target / model.name)
+                entry["modelVersion"] = source_digest(model)
             else:
                 state = "pending"
-        catalog[slot] = {"state": state, "source": digest, "preview": is_png}
+        entry["state"] = state
+        catalog[slot] = entry
     (output / "catalog.json").write_text(json.dumps(catalog) + "\n", encoding="utf-8")
 
 

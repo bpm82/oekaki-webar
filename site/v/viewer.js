@@ -26,7 +26,8 @@ async function check() {
   $('card').href = '../cards/?id=' + slot;
   try {
     const work = await currentWork();
-    if (activeModel && activeModel.dataset.source !== work?.source) {
+    const modelVersion = work?.modelVersion || work?.source;
+    if (activeModel && activeModel.dataset.source !== modelVersion) {
       activeModel.remove();
       activeModel = null;
     }
@@ -61,8 +62,8 @@ async function check() {
       model.addEventListener('error', () => {
         message('プレビューを表示できませんでした', '下のボタンでカードのARを開けます。');
       });
-      model.dataset.source = work.source;
-      model.src = asset(slot + '.glb', work.source);
+      model.dataset.source = modelVersion;
+      model.src = asset(slot + '.glb', modelVersion);
       $('media').hidden = false;
       $('media').append(model);
       activeModel = model;

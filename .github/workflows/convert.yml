@@ -2,7 +2,7 @@ name: Drawings to 3D
 on:
   push:
     branches: [main]
-    paths: ['assets/*/drawing.png', 'assets/*/*.glb', 'assets/*/status.json', 'drawings/**', 'scripts/convert.py', 'scripts/slots.py', 'scripts/requirements-cpu.txt', '.github/workflows/convert.yml']
+    paths: ['assets/*/drawing.png', 'assets/*/*.glb', 'assets/*/status.json', 'drawings/**', 'scripts/convert.py', 'scripts/slots.py', 'scripts/bake_colors.py', 'scripts/texture.py', 'scripts/requirements-cpu.txt', '.github/workflows/convert.yml']
   workflow_dispatch:
 
 permissions:
@@ -39,6 +39,11 @@ jobs:
       - name: Find new or replaced PNG files
         id: scan
         run: python scripts/convert.py scan assets $RETRY
+      - name: Install CPU texture baker
+        if: steps.scan.outputs.baking == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends blender
       - name: Check out TripoSR
         if: steps.scan.outputs.pending == 'true'
         uses: actions/checkout@v6
@@ -75,9 +80,12 @@ jobs:
           export CMAKE_PREFIX_PATH="$(python -c 'import torch; print(torch.utils.cmake_prefix_path)')"
           python -m pip install --no-build-isolation 'git+https://github.com/tatsy/torchmcubes.git@3381600ddc3d2e4d74222f8495866be5fafbace4'
           python -m pip check
-      - name: Reconstruct drawings on the hosted CPU
-        if: steps.scan.outputs.pending == 'true'
-        run: .venv/bin/python scripts/convert.py generate assets $RETRY
+      - name: Reconstruct new drawings and bake GLB base color
+        if: steps.scan.outputs.baking == 'true'
+        run: |
+          python_bin=python
+          if [[ -x .venv/bin/python ]]; then python_bin=.venv/bin/python; fi
+          "$python_bin" scripts/convert.py generate assets $RETRY
       - name: Mark any unfinished drawings for staff attention
         if: failure() && steps.scan.outputs.pending == 'true'
         run: python scripts/convert.py mark-failures assets

@@ -5,6 +5,7 @@ import traceback
 from pathlib import Path
 
 from slots import drawings, read_status, write_status
+from texture import bake_color_glb, has_baked_color
 
 
 def pending(store, retry):
@@ -17,6 +18,16 @@ def pending(store, retry):
             if status["state"] == "failed" and not retry:
                 continue
         yield slot, path, digest
+
+
+def unbaked_models(store):
+    for slot, _, digest in drawings():
+        directory = store / slot
+        status = read_status(directory)
+        model = directory / f"{slot}.glb"
+        if status.get("source") == digest and status.get("state") == "ready" and model.is_file():
+            if not model.is_symlink() and not has_baked_color(model):
+                yield model
 
 
 def prepare_image(path):
@@ -81,10 +92,10 @@ def convert(items, store):
             glb = to_gradio_3d_orientation(mesh).export(file_type="glb")
             if glb[:4] != b"glTF" or len(glb) > 80 * 1024 * 1024:
                 raise ValueError("GLBの形式またはサイズが範囲外です。")
-            directory.mkdir(parents=True, exist_ok=True)
-            (directory / f"{slot}.glb").write_bytes(glb)
+            model_path = directory / f"{slot}.glb"
+            bake_color_glb(glb, model_path)
             write_status(directory, "ready", digest)
-            print(f"{slot}: {len(mesh.faces):,} faces, {len(glb):,} bytes", flush=True)
+            print(f"{slot}: {len(mesh.faces):,} faces, {model_path.stat().st_size:,} bytes with base color", flush=True)
         except Exception:
             traceback.print_exc()
             write_status(directory, "failed", digest)
@@ -100,15 +111,27 @@ def main():
     args = parser.parse_args()
     items = list(pending(args.store, args.retry))
     if args.mode == "scan":
-        print(f"{len(items)} drawing(s) to convert")
+        unbaked = list(unbaked_models(args.store))
+        print(f"{len(items)} drawing(s) to convert, {len(unbaked)} existing model(s) to bake")
         if output := os.environ.get("GITHUB_OUTPUT"):
             with open(output, "a", encoding="utf-8") as handle:
                 print(f"pending={'true' if items else 'false'}", file=handle)
+                print(f"baking={'true' if items or unbaked else 'false'}", file=handle)
     elif args.mode == "mark-failures":
         for slot, _, digest in items:
             write_status(args.store / slot, "failed", digest)
-    elif items:
-        return convert(items, args.store)
+    elif args.mode == "generate":
+        failed = False
+        for path in unbaked_models(args.store):
+            try:
+                print(f"Baking existing {path}", flush=True)
+                bake_color_glb(path.read_bytes(), path)
+            except Exception:
+                traceback.print_exc()
+                failed = True
+        if items:
+            failed = convert(items, args.store) or failed
+        return int(failed)
     return 0
 
 

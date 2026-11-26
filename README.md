@@ -16,6 +16,12 @@
 
 受付前のフォルダにはQR画像とマーカーデータが入っています。作品ごとの追加素材も同じ番号に置けます。WebARはその番号と同じ名前のGLBを表示します。
 
+## Unityで色付きモデルを使う
+
+番号フォルダのGLBをダウンロードし、UnityのPackage Managerで **glTFast**（`com.unity.cloud.gltfast`）を追加したプロジェクトの `Assets` に入れます。インポートされたモデルをシーンに置くと、マテリアルに割り当てられた作品の色を使えます。[Unity公式のインポート手順](https://github.com/Unity-Technologies/com.unity.cloud.gltfast/blob/main/Packages/com.unity.cloud.gltfast/Documentation~/ImportEditor.md)
+
+GitHub ActionsがモデルのUVを展開し、頂点カラーを1024×1024のベースカラーテクスチャに焼き込みます。PNGとマテリアルはGLBに内蔵されるので、持ち出すファイルはGLBひとつです。
+
 ## 店での流れ
 
 1. 開店前に使う番号のカードを印刷し、店頭端末を下記の手順で接続します。薄くて曲がりやすい紙は台紙に貼ると、カメラに黒枠が入りやすくなります。
@@ -43,7 +49,7 @@
 - [Publish workshop](https://github.com/bpm82/oekaki-webar/actions/workflows/pages.yml) は受付時と変換終了時にPagesを更新します。絵とモデルの入力ハッシュが一致したものを公開し、差し替え中は「生成中」と表示します。印刷カードとマーカーは各番号の `marker.svg` と `pattern.patt` を使います。
 - 変換できなかった番号は作品ページに表示します。絵を差し替えるか、**Actions → Drawings to 3D → Run workflow** で同じ絵を再試行できます。背景から区別しやすい、色を塗った一つの被写体が向いています。一枚の絵に写っていない裏側はTripoSRが推定します。
 
-100番の初回実行では、依存関係の準備を含む変換ジョブに2分46秒かかり、14,960面・300,744バイトのGLBができました。[初回の実行ログ](https://github.com/bpm82/oekaki-webar/actions/runs/45619215609)
+以下の2件は、テクスチャ焼き込みを追加する前の実測です。100番の初回実行では、依存関係の準備を含む変換ジョブに2分46秒かかり、14,960面・300,744バイトのGLBができました。[初回の実行ログ](https://github.com/bpm82/oekaki-webar/actions/runs/45619215609)
 
 99番のリンゴは店頭画面から送信し、PNGの受付コミットから完成モデルのPages公開まで1分35秒でした。モデルと依存関係のキャッシュがある状態での1件の実測です。待ち時間は混雑や絵によって変わります。[受付コミット](https://github.com/bpm82/oekaki-webar/commit/a7d0d67ab72074f4a92b934877c90850a4ce3534) ・ [変換](https://github.com/bpm82/oekaki-webar/actions/runs/45622357038) ・ [公開](https://github.com/bpm82/oekaki-webar/actions/runs/45622536634)
 
