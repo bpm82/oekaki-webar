@@ -101,9 +101,11 @@
           >
         </p>
         <label class="form-label" for="slot">次に使うカード</label
-        ><select id="slot">
+        ><select id="slot" aria-describedby="availability">
           <option value="">空いている番号を自動で使う</option>
         </select>
+        <p id="availability" role="status" class="small"></p>
+        <button type="button" id="reload-slots" class="text-button">空き状況を更新</button>
         <p id="connection" role="status" class="small"></p>
         <div class="actions">
           <button class="primary" type="submit">設定を保存</button
@@ -112,6 +114,6 @@
         </div>
       </form>
     </dialog>
-    <script src="studio.js?v=2" type="module"></script>
+    <script src="studio.js?v=3" type="module"></script>
   </body>
 </html>

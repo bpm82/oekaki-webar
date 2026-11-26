@@ -1,4 +1,4 @@
-import { slotIds, prepareUpload, submitDrawing } from './upload.js?v=2';
+import { slotIds, occupiedSlots, prepareUpload, submitDrawing } from './upload.js?v=3';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('sheet');
@@ -201,7 +201,42 @@ $('download').onclick = async () => {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 };
-for (const id of slotIds) $('slot').add(new Option(id + '番', id));
+const slotSelect = $('slot');
+for (const id of slotIds) slotSelect.add(new Option(id + '番', id));
+let inventoryRequest = 0;
+function renderSlots(used) {
+  for (const option of slotSelect.options) {
+    if (!option.value) continue;
+    const unavailable = used?.has(option.value);
+    option.disabled = !used || unavailable;
+    option.text = option.value + '番' + (!used ? '（未確認）' : unavailable ? '（使用済み）' : '');
+  }
+}
+async function refreshSlots() {
+  const request = ++inventoryRequest;
+  const status = $('availability');
+  $('reload-slots').disabled = true;
+  renderSlots(null);
+  status.textContent = 'カードの空き状況を確認しています…';
+  try {
+    const used = await occupiedSlots($('token').value.trim() || token);
+    if (request !== inventoryRequest) return;
+    renderSlots(used);
+    if (used.has(slotSelect.value)) {
+      status.textContent = slotSelect.value + '番は使用済みです。ほかの番号を選んでください。';
+    } else if (used.size === slotIds.length) {
+      status.textContent = 'すべての番号が使用済みです。';
+    } else {
+      status.textContent = '空きは' + (slotIds.length - used.size) + '枚です。番号は送信時に確定します。';
+    }
+  } catch {
+    if (request === inventoryRequest)
+      status.textContent = '空き状況を取得できませんでした。通信とトークンを確認して更新してください。';
+  } finally {
+    if (request === inventoryRequest) $('reload-slots').disabled = false;
+  }
+}
+$('reload-slots').onclick = refreshSlots;
 function openSettings() {
   $('connection').textContent = token
     ? 'このタブは設定済みです。'
@@ -209,10 +244,12 @@ function openSettings() {
   $('slot').value = preferred;
   $('disconnect').hidden = !token;
   settings.showModal();
+  refreshSlots();
 }
 $('setup').onclick = openSettings;
 $('close').onclick = () => settings.close();
 settings.addEventListener('close', () => {
+  inventoryRequest++;
   $('token').value = '';
 });
 $('disconnect').onclick = () => {
@@ -227,6 +264,11 @@ $('settings-form').onsubmit = (e) => {
   if (!next) {
     $('connection').textContent = 'トークンを入力してください。';
     $('token').focus();
+    return;
+  }
+  if (slotSelect.selectedOptions[0]?.disabled) {
+    $('connection').textContent = '空き番号を選ぶか、自動で使う設定を選んでください。';
+    slotSelect.focus();
     return;
   }
   token = next;

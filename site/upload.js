@@ -7,7 +7,7 @@ function drawingUrl(slot) {
 
 function auth(key) {
   return {
-    Authorization: 'Bearer ' + key,
+    ...(key ? { Authorization: 'Bearer ' + key } : {}),
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
   };
@@ -48,26 +48,31 @@ export async function prepareUpload(blob) {
   return { content: btoa(binary), sha, attempted: null };
 }
 
+export async function occupiedSlots(key) {
+  const response = await fetch(repository + '/git/trees/main?recursive=1', {
+    headers: auth(key),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw apiError(response);
+  const { tree, truncated } = await response.json();
+  if (truncated || !Array.isArray(tree))
+    throw new Error('カードの空き状況をすべて確認できませんでした。');
+  const paths = new Set(tree.map((entry) => entry.path));
+  return new Set(
+    slotIds.filter((id) => paths.has('assets/' + id + '/drawing.png') || paths.has('drawings/' + id + '.png')),
+  );
+}
+
 export async function submitDrawing(key, upload, preferred) {
   const headers = auth(key);
   for (let attempt = 0; attempt < 6; attempt++) {
     // An interrupted PUT may already have committed. Reconcile it before assigning a second card.
     if (upload.attempted && (await fileSha(key, upload.attempted)) === upload.sha)
       return upload.attempted;
-    const list = await fetch(repository + '/git/trees/main?recursive=1', {
-      headers,
-      cache: 'no-store',
-    });
-    if (!list.ok) throw apiError(list);
-    const { tree, truncated } = await list.json();
-    if (truncated)
-      throw new Error('カードの空き状況をすべて確認できませんでした。スタッフにお知らせください。');
-    const files = new Set(tree.map((entry) => entry.path));
-    const occupied = (id) =>
-      files.has('assets/' + id + '/drawing.png') || files.has('drawings/' + id + '.png');
-    if (preferred && occupied(preferred))
+    const used = await occupiedSlots(key);
+    if (preferred && used.has(preferred))
       throw new Error(preferred + '番は使用中です。端末設定で空き番号を選んでください。');
-    const slot = preferred || slotIds.find((id) => !occupied(id));
+    const slot = preferred || slotIds.find((id) => !used.has(id));
     if (!slot) throw new Error('100枚のカードをすべて使用しました。スタッフにお知らせください。');
     upload.attempted = slot;
     const response = await fetch(drawingUrl(slot), {
