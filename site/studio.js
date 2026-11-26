@@ -1,4 +1,4 @@
-import { slotIds, prepareUpload, submitDrawing } from './upload.js';
+import { slotIds, prepareUpload, submitDrawing } from './upload.js?v=2';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('sheet');

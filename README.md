@@ -4,6 +4,18 @@
 
 [お絵かき画面](https://bpm82.github.io/oekaki-webar/) ・ [100番の見本のアヒル](https://bpm82.github.io/oekaki-webar/v/?id=100) ・ [番号付きカードの印刷](https://bpm82.github.io/oekaki-webar/cards/)
 
+作品を管理するときは [番号別の assets フォルダ](https://github.com/bpm82/oekaki-webar/tree/main/assets) を開きます。01〜100番のフォルダがあり、たとえば [01番](https://github.com/bpm82/oekaki-webar/tree/main/assets/01) のファイルは次のようにまとまっています。
+
+| ファイル | 用途 |
+| --- | --- |
+| `drawing.png` | 立体化する元の絵 |
+| `01.glb` | 01番のQRで表示する3Dモデル |
+| `marker.svg` | 印刷できるQR付きのマーカー画像 |
+| `pattern.patt` | カメラがマーカーを認識するためのデータ |
+| `status.json` | どの絵を変換したかと処理結果 |
+
+受付前のフォルダにはQR画像とマーカーデータが入っています。作品ごとの追加素材も同じ番号に置けます。WebARはその番号と同じ名前のGLBを表示します。
+
 ## 店での流れ
 
 1. 開店前に使う番号のカードを印刷し、店頭端末を下記の手順で接続します。薄くて曲がりやすい紙は台紙に貼ると、カメラに黒枠が入りやすくなります。
@@ -23,12 +35,12 @@
 
 ## フォルダにPNGを置く方法
 
-ブラウザから [main の drawings](https://github.com/bpm82/oekaki-webar/tree/main/drawings) に `01.png` のような名前でPNGを追加しても、同じ変換が始まります。01〜09は2桁、10〜99はそのまま、100は3桁です。すでにある番号のPNGを管理者が差し替えると、そのカードの作品が更新されます。店頭端末からの通常送信は使用中の番号を保護します。
+たとえば02番を作るには、[assets/02](https://github.com/bpm82/oekaki-webar/tree/main/assets/02) に `drawing.png` をアップロードします。店頭のお絵かき画面もこの形式で送信します。管理者が同じフォルダの `drawing.png` を差し替えると、その番号を再変換します。旧形式の `drawings/02.png` に届いた絵も、02番に元絵がなければ自動で移します。
 
 ## 変換と公開
 
-- [Drawings to 3D](https://github.com/bpm82/oekaki-webar/actions/workflows/convert.yml) は `main` のPNGを確認し、内容が新しくなった番号だけを `ubuntu-24.04` で処理します。入力画像のSHA-256と処理結果を記録し、色付きメッシュを [models ブランチの assets](https://github.com/bpm82/oekaki-webar/tree/models/assets) に自動コミットします。01番の出力は `assets/01/01.glb` です。
-- [Publish workshop](https://github.com/bpm82/oekaki-webar/actions/workflows/pages.yml) は受付時と変換終了時にPagesを更新します。絵とモデルの入力ハッシュが一致したものを公開し、差し替え中は「生成中」と表示します。カードは絵の有無にかかわらず全番号を生成します。各番号に `marker.svg` と、それに対応する `pattern.patt` が付きます。
+- [Drawings to 3D](https://github.com/bpm82/oekaki-webar/actions/workflows/convert.yml) は `main` のPNGを確認し、内容が新しくなった番号だけを `ubuntu-24.04` で処理します。入力画像のSHA-256と処理結果を記録し、色付きメッシュを元絵と同じフォルダに自動コミットします。01番の出力は `assets/01/01.glb` です。旧 `models` ブランチには移行前の履歴があります。
+- [Publish workshop](https://github.com/bpm82/oekaki-webar/actions/workflows/pages.yml) は受付時と変換終了時にPagesを更新します。絵とモデルの入力ハッシュが一致したものを公開し、差し替え中は「生成中」と表示します。印刷カードとマーカーは各番号の `marker.svg` と `pattern.patt` を使います。
 - 変換できなかった番号は作品ページに表示します。絵を差し替えるか、**Actions → Drawings to 3D → Run workflow** で同じ絵を再試行できます。背景から区別しやすい、色を塗った一つの被写体が向いています。一枚の絵に写っていない裏側はTripoSRが推定します。
 
 100番の初回実行では、依存関係の準備を含む変換ジョブに2分46秒かかり、14,960面・300,744バイトのGLBができました。[初回の実行ログ](https://github.com/bpm82/oekaki-webar/actions/runs/45619215609)

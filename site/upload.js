@@ -1,5 +1,9 @@
-const endpoint = 'https://api.github.com/repos/bpm82/oekaki-webar/contents/drawings';
+const repository = 'https://api.github.com/repos/bpm82/oekaki-webar';
 export const slotIds = Array.from({ length: 100 }, (_, i) => String(i + 1).padStart(2, '0'));
+
+function drawingUrl(slot) {
+  return repository + '/contents/assets/' + slot + '/drawing.png';
+}
 
 function auth(key) {
   return {
@@ -20,7 +24,7 @@ function apiError(response) {
 }
 
 async function fileSha(key, slot) {
-  const response = await fetch(endpoint + '/' + slot + '.png?ref=main', {
+  const response = await fetch(drawingUrl(slot) + '?ref=main', {
     headers: auth(key),
     cache: 'no-store',
   });
@@ -50,15 +54,23 @@ export async function submitDrawing(key, upload, preferred) {
     // An interrupted PUT may already have committed. Reconcile it before assigning a second card.
     if (upload.attempted && (await fileSha(key, upload.attempted)) === upload.sha)
       return upload.attempted;
-    const list = await fetch(endpoint + '?ref=main', { headers, cache: 'no-store' });
+    const list = await fetch(repository + '/git/trees/main?recursive=1', {
+      headers,
+      cache: 'no-store',
+    });
     if (!list.ok) throw apiError(list);
-    const occupied = new Set((await list.json()).map((file) => file.name));
-    if (preferred && occupied.has(preferred + '.png'))
+    const { tree, truncated } = await list.json();
+    if (truncated)
+      throw new Error('カードの空き状況をすべて確認できませんでした。スタッフにお知らせください。');
+    const files = new Set(tree.map((entry) => entry.path));
+    const occupied = (id) =>
+      files.has('assets/' + id + '/drawing.png') || files.has('drawings/' + id + '.png');
+    if (preferred && occupied(preferred))
       throw new Error(preferred + '番は使用中です。端末設定で空き番号を選んでください。');
-    const slot = preferred || slotIds.find((id) => !occupied.has(id + '.png'));
+    const slot = preferred || slotIds.find((id) => !occupied(id));
     if (!slot) throw new Error('100枚のカードをすべて使用しました。スタッフにお知らせください。');
     upload.attempted = slot;
-    const response = await fetch(endpoint + '/' + slot + '.png', {
+    const response = await fetch(drawingUrl(slot), {
       method: 'PUT',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -2,7 +2,7 @@ name: Drawings to 3D
 on:
   push:
     branches: [main]
-    paths: ['drawings/**', 'scripts/convert.py', 'scripts/slots.py', 'scripts/requirements-cpu.txt', '.github/workflows/convert.yml']
+    paths: ['assets/*/drawing.png', 'assets/*/*.glb', 'assets/*/status.json', 'drawings/**', 'scripts/convert.py', 'scripts/slots.py', 'scripts/requirements-cpu.txt', '.github/workflows/convert.yml']
   workflow_dispatch:
 
 permissions:
@@ -23,29 +23,22 @@ jobs:
       OMP_NUM_THREADS: '4'
       MKL_NUM_THREADS: '4'
       PYTHONPATH: ${{ github.workspace }}/.engine
-      MODEL_STORE: ${{ github.workspace }}/.model-store
       RETRY: ${{ github.event_name == 'workflow_dispatch' && '--retry' || '' }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: main
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v6
         id: python
         with:
           python-version: '3.11'
-      - name: Open the generated models branch
-        run: |
-          git init -q -b models "$MODEL_STORE"
-          git -C "$MODEL_STORE" remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
-          refs=$(git -C "$MODEL_STORE" ls-remote --heads origin refs/heads/models)
-          if [[ -n "$refs" ]]; then
-            git -C "$MODEL_STORE" fetch --quiet --depth=1 origin refs/heads/models
-            git -C "$MODEL_STORE" checkout --quiet -B models FETCH_HEAD
-          fi
+      - name: Move legacy submissions into available numbered folders
+        run: python scripts/slots.py
       - name: Find new or replaced PNG files
         id: scan
-        run: python scripts/convert.py scan "$MODEL_STORE/assets" $RETRY
+        run: python scripts/convert.py scan assets $RETRY
       - name: Check out TripoSR
         if: steps.scan.outputs.pending == 'true'
         uses: actions/checkout@v6
@@ -84,18 +77,26 @@ jobs:
           python -m pip check
       - name: Reconstruct drawings on the hosted CPU
         if: steps.scan.outputs.pending == 'true'
-        run: .venv/bin/python scripts/convert.py generate "$MODEL_STORE/assets" $RETRY
+        run: .venv/bin/python scripts/convert.py generate assets $RETRY
       - name: Mark any unfinished drawings for staff attention
         if: failure() && steps.scan.outputs.pending == 'true'
-        run: python scripts/convert.py mark-failures "$MODEL_STORE/assets"
-      - name: Save models and generation status
-        if: '!cancelled() && steps.scan.outputs.pending == ''true'''
+        run: python scripts/convert.py mark-failures assets
+      - name: Save results beside the submitted drawings
+        if: '!cancelled() && steps.scan.outcome == ''success'''
         env:
           GH_TOKEN: ${{ github.token }}
-        working-directory: ${{ env.MODEL_STORE }}
         run: |
-          git add -- assets
+          git add -- assets/
+          if [[ -n "$(git ls-files -- drawings/)" ]]; then git add --update -- drawings/; fi
           if git diff --cached --quiet; then exit 0; fi
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Update numbered 3D models'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Save generated models in their numbered asset folders'
           gh auth setup-git
-          git push origin HEAD:refs/heads/models
+          for attempt in 1 2 3 4 5; do
+            git fetch --quiet origin main
+            git rebase origin/main
+            if git push origin HEAD:refs/heads/main; then exit 0; fi
+            sleep "$attempt"
+          done
+          exit 1
