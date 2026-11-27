@@ -7,10 +7,10 @@
   <title>クリスマス工房</title>
   <link rel="stylesheet" href="game.css">
   <script src="vendor/matter.min.js" defer></script>
-  <script src="decorations.js" defer></script>
-  <script src="tutorial.js" defer></script>
+  <script src="decorations.js?v=2" defer></script>
+  <script src="tutorial.js?v=2" defer></script>
   <script src="nickname.js" defer></script>
-  <script src="game.js" defer></script>
+  <script src="game.js?v=2" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -30,10 +30,10 @@
         <canvas id="welcome-art" width="880" height="430" class="welcome-art" aria-hidden="true"></canvas>
         <div class="welcome-copy">
           <h1 id="welcome-title">ツリーを作ろう！</h1>
-          <p>飾りをくっつけて、どこまで大きくできるかな？</p>
+          <p id="welcome-hint">飾りをくっつけて、どこまで大きくできるかな？</p>
         </div>
         <div class="start-fields">
-          <label for="player-name">ランキングに表示する名前</label>
+          <label id="player-label" for="player-name">ランキングに表示する名前</label>
           <input id="player-name" name="player" maxlength="16" placeholder="ニックネーム" autocomplete="nickname" aria-describedby="nickname-error" required>
           <p id="nickname-error" class="field-error" role="alert" hidden></p>
           <button class="button primary" type="submit">スタート</button>
@@ -97,6 +97,7 @@
             <p id="round-score" class="round-score"></p>
             <p id="round-top-five" class="round-top-five" hidden></p>
             <p id="round-rank"></p>
+            <p id="round-sync" role="status" hidden></p>
             <div id="round-actions">
               <button id="retry" class="button primary" type="button">もう一回遊ぶ</button>
               <button id="show-results" class="button primary" type="button" hidden>ランキングと作品へ</button>
@@ -117,11 +118,12 @@
       <form method="dialog"><button class="button secondary" type="submit">閉じる</button></form>
     </div>
     <p id="my-ranking" class="my-ranking" hidden></p>
+    <p id="ranking-sync" role="status" hidden></p>
     <button id="open-work" class="button primary" type="button" hidden>立体化したサンプルを見る</button>
     <div id="podium" class="podium" aria-label="上位3人"></div>
     <p id="empty-ranking">プレイするとスコアがここに入ります。</p>
     <section id="ranking-list" hidden>
-      <div class="ranking-list-heading"><h3 id="ranking-list-title">全員のランキング</h3><span>このブラウザの記録</span></div>
+      <div class="ranking-list-heading"><h3 id="ranking-list-title">全員のランキング</h3><span id="ranking-source">このブラウザの記録</span></div>
       <div id="ranking-scroll" class="ranking-scroll" role="region" aria-labelledby="ranking-list-title" tabindex="0">
         <table aria-labelledby="ranking-list-title">
           <thead id="ranking-columns"><tr><th scope="col">順位</th><th scope="col">プレイヤー</th><th scope="col">ベストスコア</th></tr></thead>

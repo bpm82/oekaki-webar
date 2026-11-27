@@ -111,6 +111,14 @@ function paintDetails(ctx, level) {
       star(ctx, 0, 1, 16, "#ffe59a");
       break;
     case 1:
+      if (pieces[1].artwork) {
+        const image = pieces[1].artwork;
+        const scale = Math.min(30 / image.width, 30 / image.height);
+        const width = image.width * scale, height = image.height * scale;
+        circle(ctx, 0, 3, 17.8, "#fffae6");
+        ctx.drawImage(image, -width / 2, 3 - height / 2, width, height);
+        break;
+      }
       star(ctx, 0, 3, 11, "#ffcc81");
       circle(ctx, -9, -5, 2.5, "#ffada3");
       break;

@@ -128,8 +128,15 @@ function drawWelcomeArt(ctx) {
   star(ctx, 752, 227, 10, "#e5a25e");
 }
 
-drawWelcomeArt(document.getElementById("welcome-art").getContext("2d"));
-drawDropRule(document.getElementById("rule-drop").getContext("2d"));
-drawMergeRule(document.getElementById("rule-merge").getContext("2d"));
-drawGrowthRule(document.getElementById("rule-growth").getContext("2d"));
-drawOverflowRule(document.getElementById("rule-overflow").getContext("2d"));
+function drawTutorial() {
+  for (const [id, draw] of [
+    ["welcome-art", drawWelcomeArt], ["rule-drop", drawDropRule], ["rule-merge", drawMergeRule],
+    ["rule-growth", drawGrowthRule], ["rule-overflow", drawOverflowRule],
+  ]) {
+    const canvas = document.getElementById(id);
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    draw(ctx);
+  }
+}
+drawTutorial();

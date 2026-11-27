@@ -6,16 +6,20 @@ import {
   reserveCard,
   releaseCard,
   renewBefore,
-} from './upload.js?v=4';
+  storedToken,
+  clearStaffToken,
+  saveStaffToken,
+} from './upload.js?v=5';
 import { drawTemplate, drawingTemplates } from './drawing-templates.js';
-import { readReceipt, saveReceipt } from './receipt.js?v=2';
+import { readReceipt, saveReceipt } from './receipt.js?v=3';
+import { retryPendingRounds } from './event-ranking.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('sheet');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const settings = $('settings');
-const tokenKey = 'oekaki-webar:staff-token';
 const history = [];
+let selectedTemplate = '';
 const colors = [
   ['ink', 'すみ色'],
   ['coral', 'あか'],
@@ -43,13 +47,6 @@ let lease = null,
   expiryTimer,
   editingSettings = false;
 
-function storedToken() {
-  try {
-    return localStorage.getItem(tokenKey) ?? '';
-  } catch {
-    return '';
-  }
-}
 function currentToken() {
   return temporaryToken || storedToken();
 }
@@ -117,7 +114,7 @@ function refresh() {
   $('download').disabled = !hasInk || busy;
 }
 function remember() {
-  history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  history.push({ pixels: ctx.getImageData(0, 0, canvas.width, canvas.height), template: selectedTemplate });
   if (history.length > 8) history.shift();
   upload = null;
   say('');
@@ -145,6 +142,7 @@ for (const template of drawingTemplates) {
   button.onclick = () => {
     if (busy || pointer !== null) return;
     remember();
+    selectedTemplate = template.name;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawTemplate(canvas, template);
     pickTool('bucket');
@@ -260,7 +258,11 @@ function finishStroke(event) {
 }
 canvas.onpointerup = canvas.onpointercancel = canvas.onlostpointercapture = finishStroke;
 $('undo').onclick = () => {
-  if (history.length) ctx.putImageData(history.pop(), 0, 0);
+  const previous = history.pop();
+  if (previous) {
+    ctx.putImageData(previous.pixels, 0, 0);
+    selectedTemplate = previous.template;
+  }
   upload = null;
   refresh();
 };
@@ -277,6 +279,7 @@ $('import').onchange = async (event) => {
     await image.decode();
     if (busy) return;
     remember();
+    selectedTemplate = '';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const scale = Math.min(canvas.width / image.width, canvas.height / image.height);
     const w = image.width * scale,
@@ -387,7 +390,7 @@ $('disconnect').onclick = async () => {
   const token = currentToken();
   lockSettings(true);
   try {
-    if (storedToken()) localStorage.removeItem(tokenKey);
+    clearStaffToken();
     temporaryToken = '';
     let released = true;
     if (token && lease) {
@@ -432,17 +435,15 @@ $('settings-form').onsubmit = async (e) => {
     if (hasInk || lease || selection) await claim(next, selection);
     else if (enteredToken) await cardInventory(next);
     if (!lease) cardStatus('描き始めると、空いているカード番号を確保します。');
-    try {
-      localStorage.setItem(tokenKey, next);
-      temporaryToken = '';
-    } catch {
-      temporaryToken = next;
-    }
+    const storage = saveStaffToken(next);
+    temporaryToken = storage ? '' : next;
     preferred = selection;
+    retryPendingRounds();
     settings.close();
     say(
       temporaryToken
         ? 'このタブは接続しました。ブラウザに保存できませんでした。'
+        : storage === 'sessionStorage' ? 'このタブに端末設定を保存しました。'
         : 'このブラウザに端末設定を保存しました。',
     );
   } catch (error) {
@@ -482,7 +483,7 @@ $('send').onclick = async () => {
     if (currentToken() !== token)
       throw new Error('端末の接続が変わりました。もう一度「完成」を押してください。');
     const id = await submitDrawing(token, upload, owner, lease.slot);
-    saveReceipt(id);
+    saveReceipt(id, selectedTemplate, canvas);
     showReceipt(id);
   } catch (error) {
     say(
@@ -498,6 +499,9 @@ $('send').onclick = async () => {
   }
 };
 const savedCard = readReceipt();
+retryPendingRounds();
+window.addEventListener('online', retryPendingRounds);
+window.setInterval(retryPendingRounds, 30000);
 if (slotIds.includes(savedCard)) showReceipt(savedCard);
 else if (currentToken()) cardStatus('描き始めると、空いているカード番号を確保します。');
 refresh();

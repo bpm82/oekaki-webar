@@ -4,7 +4,36 @@ const hour = 60 * 60 * 1000;
 export const renewBefore = hour / 2;
 export const slotIds = Array.from({ length: 100 }, (_, i) => String(i + 1).padStart(2, '0'));
 
-async function api(key, path, method = 'GET', body) {
+const staffTokenKey = 'oekaki-webar:staff-token';
+export function storedToken() {
+  for (const store of ['sessionStorage', 'localStorage']) {
+    try {
+      const token = globalThis[store].getItem(staffTokenKey);
+      if (token) return token;
+    } catch { /* Try the other storage when one is unavailable. */ }
+  }
+  return '';
+}
+
+export function clearStaffToken() {
+  for (const store of ['sessionStorage', 'localStorage']) {
+    try { globalThis[store].removeItem(staffTokenKey); } catch { /* Unavailable storage. */ }
+  }
+  if (storedToken()) throw new Error('保存したトークンを削除できませんでした。');
+}
+
+export function saveStaffToken(token) {
+  clearStaffToken();
+  for (const store of ['localStorage', 'sessionStorage']) {
+    try {
+      globalThis[store].setItem(staffTokenKey, token);
+      return store;
+    } catch { /* Try tab storage if persistent storage is unavailable. */ }
+  }
+  return '';
+}
+
+export async function api(key, path, method = 'GET', body) {
   const response = await fetch(repository + path, {
     method,
     headers: {

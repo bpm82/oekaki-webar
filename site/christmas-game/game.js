@@ -63,8 +63,13 @@ const workCanvas = byId("work-preview");
 const format = new Intl.NumberFormat("ja-JP");
 const inWaitingViewer = typeof window !== "undefined" && window.parent !== window &&
   new URLSearchParams(window.location.search).get("embedded") === "1";
+const cardParam = inWaitingViewer && new URLSearchParams(window.location.search).get("id");
+const eventCard = /^(?:0[1-9]|[1-9]\d|100)$/.test(cardParam) ? cardParam : null;
 
-let scores = readScores();
+let scores = eventCard ? [] : readScores();
+let loadedEventScores = false;
+let pendingRoundId = "";
+let lastRoundEnd = "";
 let name = "";
 let mode = "intro";
 let generationCompletesAt = 0;
@@ -111,6 +116,15 @@ function rankedScores() {
 }
 
 function recordScore() {
+  if (eventCard) {
+    pendingRoundId = crypto.randomUUID();
+    setRankingNotice("この回の点数を会場に記録しています…");
+    window.parent.postMessage({
+      type: "oekaki-wait-game:round",
+      round: { id: pendingRoundId, name, score, updatedAt: Date.now() },
+    }, window.location.origin);
+    return;
+  }
   const savedScores = readScores();
   for (const entry of savedScores) {
     const existing = scores.findIndex((record) => record.name === entry.name);
@@ -130,8 +144,25 @@ function recordScore() {
   }
 }
 
+function isPlayer(entry) {
+  return Boolean(entry && (eventCard ? entry.card === eventCard : entry.name === name));
+}
+
+function playerLabel(entry, entries) {
+  if (eventCard && entries.some((other) => other.card !== entry.card && other.name === entry.name))
+    return `${entry.name}（${entry.card}番）`;
+  return entry.name;
+}
+
+function setRankingNotice(message) {
+  for (const id of ["round-sync", "ranking-sync"]) {
+    byId(id).textContent = message;
+    byId(id).hidden = !message;
+  }
+}
+
 function ownPlacement(entries) {
-  const entry = entries.find((record) => record.name === name);
+  const entry = entries.find(isPlayer);
   if (!entry) return "";
   return `${entries.length}人中 ${entry.rank}位`;
 }
@@ -159,7 +190,7 @@ function renderScores() {
   byId("my-ranking").hidden = !position;
   byId("my-ranking").textContent = position ? `あなたの順位  ${position}` : "";
   byId("open-work").hidden = mode !== "complete" || !ready;
-  byId("empty-ranking").hidden = entries.length > 0;
+  byId("empty-ranking").hidden = entries.length > 0 || Boolean(eventCard && !loadedEventScores);
   byId("ranking-list").hidden = entries.length === 0;
   rankingScroll.setAttribute("data-result-view", String(resultView));
 
@@ -168,9 +199,9 @@ function renderScores() {
   let playerRow = null;
   let playerIndex = -1;
   entries.forEach((entry, index) => {
-    const fields = [`${entry.rank}位`, entry.name, format.format(entry.score)];
+    const fields = [`${entry.rank}位`, playerLabel(entry, entries), format.format(entry.score)];
     const row = document.createElement("tr");
-    if (entry.name === name) {
+    if (isPlayer(entry)) {
       row.className = "own-score";
       row.setAttribute("aria-current", "true");
       if (resultView) {
@@ -210,7 +241,7 @@ function renderScores() {
 function renderPlayRanking() {
   const entries = rankedScores();
   const leaders = entries.slice(0, PLAY_RANKING_LIMIT);
-  const ownEntry = entries.find((entry) => entry.name === name);
+  const ownEntry = entries.find(isPlayer);
   // Include the player when a tie at the cutoff extends past the displayed rows.
   if (ownEntry && ownEntry.rank <= PLAY_RANKING_LIMIT && !leaders.includes(ownEntry)) {
     leaders[leaders.length - 1] = ownEntry;
@@ -222,17 +253,17 @@ function renderPlayRanking() {
     const row = document.createElement("li");
     row.setAttribute("data-rank", position);
     if (!entry) row.setAttribute("data-empty", "true");
-    const isOwnEntry = entry?.name === name;
+    const isOwnEntry = isPlayer(entry);
     if (isOwnEntry) row.setAttribute("aria-current", "true");
     const rank = document.createElement("span");
     rank.className = "rank-chip";
     rank.textContent = `${position}位`;
     const player = document.createElement("span");
     player.className = "rank-player";
-    player.title = entry?.name ?? "記録なし";
+    player.title = entry ? playerLabel(entry, entries) : "記録なし";
     const nickname = document.createElement("span");
     nickname.className = "rank-name";
-    nickname.textContent = entry?.name ?? "—";
+    nickname.textContent = entry ? player.title : "—";
     player.append(nickname);
     if (isOwnEntry) {
       const label = document.createElement("span");
@@ -250,9 +281,9 @@ function renderPlayRanking() {
 
 function updateScore() {
   scoreNumber.textContent = format.format(score);
-  const best = scores.find((entry) => entry.name === name);
+  const best = scores.find(isPlayer);
   byId("best-score").textContent = best ? format.format(best.score) : "—";
-  const opponents = scores.filter((entry) => entry.name !== name && !hasProhibitedNickname(entry.name));
+  const opponents = scores.filter((entry) => !isPlayer(entry) && !hasProhibitedNickname(entry.name));
   const currentRank = 1 + opponents.filter((entry) => entry.score > score).length;
   byId("play-rank").textContent = opponents.length ? `${currentRank}位` : "—";
 }
@@ -305,7 +336,7 @@ function startRound(now = performance.now()) {
   bodies = [];
   effects = [];
   score = 0;
-  current = randomPiece();
+  current = eventCard ? 1 : randomPiece();
   next = randomPiece();
   aim = WIDTH / 2;
   cooldown = 0;
@@ -323,18 +354,19 @@ function startRound(now = performance.now()) {
   board.focus({ preventScroll: true });
 }
 
-function showRoundResult(timedOut = false) {
+function showRoundResult() {
   const entries = rankedScores();
   const position = ownPlacement(entries);
-  const personalRank = entries.find((entry) => entry.name === name)?.rank ?? Infinity;
-  byId("round-title").textContent = timedOut ? "タイムアップ！"
+  const personalRank = entries.find(isPlayer)?.rank ?? Infinity;
+  byId("round-title").textContent = lastRoundEnd === "timeout" ? "タイムアップ！"
+    : lastRoundEnd === "return" ? "今回はここまで！"
     : ready ? "作品ができました！"
       : generationFailed ? "立体化を確認してください" : "箱がいっぱい！";
   byId("round-score").textContent = `${format.format(score)} 点`;
   const rankBadge = byId("round-top-five");
-  rankBadge.hidden = personalRank > PLAY_RANKING_LIMIT;
+  rankBadge.hidden = Boolean(pendingRoundId) || personalRank > PLAY_RANKING_LIMIT;
   rankBadge.textContent = rankBadge.hidden ? "" : `トップ${personalRank}位！`;
-  byId("round-rank").textContent = `ベストスコアで ${position}`;
+  byId("round-rank").textContent = position && !pendingRoundId ? `ベストスコアで ${position}` : "";
   byId("retry").hidden = generationFinished();
   byId("show-results").hidden = !generationFinished();
   byId("show-results").textContent = ready ? "ランキングと作品へ" : "ランキングを見る";
@@ -343,7 +375,9 @@ function showRoundResult(timedOut = false) {
   if (leaderboard.open) renderScores();
 }
 
-function endRound(timedOut = false) {
+function endRound(reason = "overflow") {
+  if (mode !== "playing") return;
+  lastRoundEnd = reason;
   mode = generationFinished() ? "complete" : "between";
   roundEndsAt = 0;
   setRoundClock(generationFinished() ? 0 : ROUND_DURATION);
@@ -352,8 +386,8 @@ function endRound(timedOut = false) {
   recordScore();
   updateScore();
   renderPlayRanking();
-  showRoundResult(timedOut);
-  if (!leaderboard.open) byId("round-title").focus({ preventScroll: true });
+  showRoundResult();
+  if (!leaderboard.open && reason !== "return") byId("round-title").focus({ preventScroll: true });
 }
 
 function generationFinished() {
@@ -412,7 +446,7 @@ function updateSessionTime(now) {
   const secondsLeft = Math.max(0, Math.ceil((roundEndsAt - now) / 1000));
   setRoundClock(secondsLeft);
   if (secondsLeft === 0) {
-    endRound(true);
+    endRound("timeout");
     drawBoard();
   }
 }
@@ -653,6 +687,7 @@ function frame(now) {
 }
 
 function buildPieceGuide() {
+  byId("piece-guide").replaceChildren();
   pieces.forEach((piece, index) => {
     const item = document.createElement("li");
     item.title = piece.name;
@@ -716,6 +751,7 @@ byId("retry").addEventListener("click", () => {
 });
 
 function openRanking() {
+  if (eventCard) window.parent.postMessage({ type: "oekaki-wait-game:refresh-ranking" }, window.location.origin);
   const playerRow = renderScores();
   if (leaderboard.open) return;
   leaderboard.showModal();
@@ -862,11 +898,61 @@ drawBoard();
 if (inWaitingViewer) {
   generationProgress.removeAttribute("value");
   byId("open-work").textContent = "立体化した作品を見る";
+  if (eventCard) {
+    byId("player-label").textContent = "会場ランキングに載せるニックネーム";
+    byId("play-ranking-title").textContent = "会場ランキング";
+    byId("leaderboard-title").textContent = "会場ランキング";
+    byId("ranking-source").textContent = "会場の全端末";
+    setRankingNotice("会場のランキングを読み込み中…");
+  }
   window.addEventListener("message", (event) => {
     if (event.origin !== window.location.origin || event.source !== window.parent) return;
     if (event.data?.type === "oekaki-wait-game:state" &&
       (event.data.state === "ready" || event.data.state === "failed")) {
       finishGeneration(event.data.state);
+    }
+    if (!eventCard) return;
+    if (event.data?.type === "oekaki-wait-game:closed") {
+      if (mode === "playing") endRound("return");
+      if (mode === "starting") {
+        mode = "rules";
+        roundStartCue.hidden = true;
+        sessionClock.hidden = true;
+        byId("game-screen").hidden = true;
+        byId("rules-screen").hidden = false;
+      }
+    }
+    if (event.data?.type === "oekaki-wait-game:drawing") {
+      const drawing = event.data.drawing;
+      if (drawing?.card !== eventCard || !drawing.image?.startsWith("data:image/png;base64,")) return;
+      const image = new Image();
+      image.onload = () => {
+        pieces[1].artwork = image;
+        pieces[1].name = "自分の" + drawing.name + "のオーナメント";
+        byId("welcome-hint").textContent = "最初に落とす飾りには、きみが描いた" + drawing.name + "が入っているよ。";
+        drawTutorial();
+        buildPieceGuide();
+        updateNextPiece();
+        drawBoard();
+      };
+      image.src = drawing.image;
+    }
+    if (event.data?.type === "oekaki-wait-game:ranking") {
+      loadedEventScores = true;
+      scores = event.data.scores;
+      if (event.data.recorded.includes(pendingRoundId)) pendingRoundId = "";
+      setRankingNotice(pendingRoundId ? "この回の点数を会場に記録しています…" : "");
+      if (!pendingRoundId && (mode === "between" || mode === "complete")) {
+        byId("round-sync").textContent = `今回の${format.format(score)}点を会場に記録しました。`;
+        byId("round-sync").hidden = false;
+      }
+      updateScore();
+      renderPlayRanking();
+      if (mode === "between" || mode === "complete") showRoundResult();
+      else if (leaderboard.open) renderScores();
+    }
+    if (event.data?.type === "oekaki-wait-game:ranking-error") {
+      setRankingNotice((pendingRoundId ? "この回の点数は送信待ちです。 " : "会場の順位を更新できません。 ") + event.data.message);
     }
   });
   window.parent.postMessage({ type: "oekaki-wait-game:connected" }, window.location.origin);

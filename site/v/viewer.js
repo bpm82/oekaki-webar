@@ -1,5 +1,7 @@
 import { slot, currentWork, asset } from './slot.js';
-import { clearReceipt } from '../receipt.js?v=2';
+import { clearReceipt, readGameDrawing, readReceipt } from '../receipt.js?v=3';
+import { personalBests, queueRound, retryPendingRounds, syncEventRounds } from '../event-ranking.js';
+import { storedToken } from '../upload.js?v=5';
 const $ = (id) => document.getElementById(id);
 const gameButton = $('play-waiting');
 const gameDialog = $('wait-game-dialog');
@@ -9,6 +11,7 @@ const markerDialog = $('marker-dialog');
 const receptionMenu = $('reception-menu');
 const query = new URLSearchParams(location.search);
 const fromReceipt = query.get('play') === '1';
+const eventStation = slot && (Boolean(storedToken()) || readReceipt() === slot);
 let openOnce = fromReceipt;
 let generationState = 'pending';
 let activeModel = null;
@@ -26,7 +29,8 @@ function sendGameState() {
 
 function openWaitingGame() {
   if (gameButton.hidden || gameDialog.open) return;
-  if (!gameFrame.hasAttribute('src')) gameFrame.src = '../christmas-game/?embedded=1';
+  if (!gameFrame.hasAttribute('src'))
+    gameFrame.src = '../christmas-game/?embedded=1' + (eventStation ? '&id=' + slot : '');
   gameDialog.showModal();
   sendGameState();
 }
@@ -47,6 +51,9 @@ function updateWaitingGame(work) {
 }
 
 gameButton.addEventListener('click', openWaitingGame);
+gameDialog.addEventListener('close', () => {
+  gameFrame.contentWindow?.postMessage({ type: 'oekaki-wait-game:closed' }, location.origin);
+});
 markerButton.addEventListener('click', () => {
   $('card-marker').src = asset('marker.svg');
   markerDialog.showModal();
@@ -63,9 +70,35 @@ function updateCompletedActions() {
   receptionMenu.hidden = !ready;
   if (receptionMenu.hidden) receptionMenu.open = false;
 }
+async function refreshGameRanking() {
+  if (!eventStation) return;
+  const frame = gameFrame.contentWindow;
+  try {
+    const rounds = await syncEventRounds();
+    frame?.postMessage({
+      type: 'oekaki-wait-game:ranking', scores: personalBests(rounds),
+      recorded: rounds.filter((round) => round.card === slot).map((round) => round.id),
+    }, location.origin);
+  } catch (error) {
+    frame?.postMessage({
+      type: 'oekaki-wait-game:ranking-error',
+      message: error instanceof TypeError ? '通信が戻ると自動で更新します。' : error.message,
+    }, location.origin);
+  }
+}
 window.addEventListener('message', (event) => {
   if (event.origin !== location.origin || event.source !== gameFrame.contentWindow) return;
-  if (event.data?.type === 'oekaki-wait-game:connected') sendGameState();
+  if (event.data?.type === 'oekaki-wait-game:connected') {
+    const drawing = readGameDrawing(slot);
+    if (drawing) event.source.postMessage({ type: 'oekaki-wait-game:drawing', drawing }, location.origin);
+    sendGameState();
+    refreshGameRanking();
+  }
+  if (event.data?.type === 'oekaki-wait-game:refresh-ranking') refreshGameRanking();
+  if (eventStation && event.data?.type === 'oekaki-wait-game:round') {
+    queueRound({ ...event.data.round, card: slot });
+    refreshGameRanking();
+  }
   if (event.data?.type === 'oekaki-wait-game:show-work' && generationState !== 'pending' && gameDialog.open) {
     gameDialog.close();
     $('title').focus({ preventScroll: true });
@@ -166,6 +199,10 @@ async function check() {
 if (slot && query.get('id') && query.get('view') !== '3d' && !fromReceipt) {
   location.replace('ar.html?id=' + slot);
 } else {
+  retryPendingRounds();
+  const refreshScores = () => gameDialog.open ? refreshGameRanking() : retryPendingRounds();
+  window.addEventListener('online', refreshScores);
+  window.setInterval(() => { if (!document.hidden) refreshScores(); }, 30000);
   check();
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && !activeModel) check();
