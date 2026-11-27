@@ -20,10 +20,10 @@ function draw() {
     img.src = '../assets/' + id + '/marker.svg';
     img.alt = id + '番のQR兼ARマーカー';
     const link = document.createElement('a');
-    link.href = '../v/?id=' + id;
+    link.href = '../v/?id=' + id + '&view=3d';
     link.textContent = 'この番号の作品を見る';
     const hint = document.createElement('p');
-    hint.textContent = 'QRを読み取ると、この作品を開けます。';
+    hint.textContent = 'QRを読んでカメラを許可し、このカードの黒い枠全体を映してね。';
     card.append(heading, img, link, hint);
     list.append(card);
   }

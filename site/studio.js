@@ -456,8 +456,9 @@ function showReceipt(id) {
   submittedCard = id;
   clearTimeout(expiryTimer);
   $('assigned').textContent = id;
-  $('view-link').href = 'v/?id=' + id;
-  $('wait-game-link').href = 'v/?id=' + id + '&play=1';
+  const viewer = 'v/?id=' + id + '&view=3d';
+  $('view-link').href = viewer;
+  $('wait-game-link').href = viewer + '&play=1';
   $('studio').hidden = true;
   $('receipt').hidden = false;
   $('setup').disabled = true;

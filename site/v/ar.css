@@ -15,26 +15,15 @@ body {
   top: max(12px, env(safe-area-inset-top));
   left: 12px;
   right: 12px;
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 12px;
   pointer-events: none;
 }
-.overlay a,
 .overlay p {
+  width: fit-content;
+  max-width: 30rem;
   margin: 0;
   padding: 0.55rem 0.8rem;
   border-radius: 10px;
   background: #12352eed;
   color: white;
-}
-.overlay a {
-  pointer-events: auto;
-  flex: none;
-  text-underline-offset: 0.2em;
-}
-.overlay p {
-  max-width: 30rem;
   font-size: 0.9rem;
 }

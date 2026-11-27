@@ -22,16 +22,30 @@ async function start() {
     tell('番号付きのカードのQRから開いてください。');
     return;
   }
-  document.getElementById('back').href = './?id=' + slot;
-  const work = await currentWork();
+  let work;
+  try {
+    work = await currentWork();
+  } catch {
+    tell('作品を確認できませんでした。通信が戻ると自動で確認します。');
+    setTimeout(checkWork, 15000);
+    return;
+  }
   if (work?.state !== 'ready') {
-    tell('「作品に戻る」で立体化の進み具合を確認できます。');
+    if (work?.state === 'failed') {
+      tell('立体化をやり直す必要があります。スタッフに' + slot + '番と伝えてください。');
+    } else if (work) {
+      tell(slot + '番を立体化しています。できあがると、この画面が切り替わります。');
+    } else {
+      tell(slot + '番の絵を待っています。絵が届くと、この画面が切り替わります。');
+    }
+    setTimeout(checkWork, 15000);
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia) {
     tell('カメラを使えるブラウザで、このカードのURLを開いてください。');
     return;
   }
+  tell('カメラを準備しています… 許可を求められたら「許可」を選んでね。');
   await script('../vendor/aframe.js');
   await script('../vendor/aframe-ar.js');
   const THREE = window.AFRAME.THREE;
@@ -108,7 +122,7 @@ async function start() {
   });
   model.addEventListener('model-error', () => {
     failed = true;
-    tell('立体の読み込みに失敗しました。「作品に戻る」からもう一度開いてください。');
+    tell('立体の読み込みに失敗しました。通信を確認してページを開き直してください。');
   });
   marker.append(model);
   scene.append(marker);
@@ -120,6 +134,9 @@ async function start() {
     if (found && loaded && !document.hidden) hint();
   }, 500);
 }
-start().catch(() =>
-  tell('ARを読み込めませんでした。接続を確認して「作品に戻る」から開き直してください。'),
-);
+function checkWork() {
+  start().catch(() =>
+    tell('ARを読み込めませんでした。通信を確認してページを開き直してください。'),
+  );
+}
+checkWork();

@@ -7,7 +7,8 @@ const gameFrame = $('wait-game-frame');
 const markerButton = $('show-marker');
 const markerDialog = $('marker-dialog');
 const receptionMenu = $('reception-menu');
-const fromReceipt = new URLSearchParams(location.search).get('play') === '1';
+const query = new URLSearchParams(location.search);
+const fromReceipt = query.get('play') === '1';
 let openOnce = fromReceipt;
 let generationState = 'pending';
 let activeModel = null;
@@ -161,7 +162,12 @@ async function check() {
   }
   checkLater();
 }
-check();
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && !activeModel) check();
-});
+// Existing printed markers encode ?id=NN. The studio opts into the 3D viewer.
+if (slot && query.get('id') && query.get('view') !== '3d' && !fromReceipt) {
+  location.replace('ar.html?id=' + slot);
+} else {
+  check();
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && !activeModel) check();
+  });
+}
