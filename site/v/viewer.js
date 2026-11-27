@@ -6,8 +6,7 @@ const gameDialog = $('wait-game-dialog');
 const gameFrame = $('wait-game-frame');
 const markerButton = $('show-marker');
 const markerDialog = $('marker-dialog');
-const cameraLink = $('open-ar-camera');
-const newReception = $('new-reception');
+const receptionMenu = $('reception-menu');
 const fromReceipt = new URLSearchParams(location.search).get('play') === '1';
 let openOnce = fromReceipt;
 let generationState = 'pending';
@@ -51,8 +50,8 @@ markerButton.addEventListener('click', () => {
   $('card-marker').src = asset('marker.svg');
   markerDialog.showModal();
 });
-newReception.addEventListener('click', () => {
-  if (newReception.hidden) return;
+$('new-reception').addEventListener('click', () => {
+  if (receptionMenu.hidden || !receptionMenu.open) return;
   clearReceipt();
   location.replace('../');
 });
@@ -61,9 +60,8 @@ function updateCompletedActions() {
   const submittedHere = slot !== null && readReceipt() === slot;
   document.documentElement.classList.toggle('work-ready', ready);
   markerButton.hidden = !ready;
-  newReception.hidden = !ready || !submittedHere;
-  cameraLink.hidden = !ready || submittedHere;
-  if (!cameraLink.hidden) cameraLink.href = 'ar.html?id=' + slot;
+  receptionMenu.hidden = !ready || !submittedHere;
+  if (receptionMenu.hidden) receptionMenu.open = false;
 }
 window.addEventListener('pageshow', updateCompletedActions);
 window.addEventListener('message', (event) => {
@@ -115,7 +113,7 @@ async function check() {
       } catch {
         message(
           '立体ができました！',
-          '3Dプレビューを読み込めませんでした。作品カードを使ってARで見られます。',
+          '3Dプレビューを読み込めませんでした。ページを開き直してください。',
         );
         return;
       }
@@ -130,7 +128,7 @@ async function check() {
         $('drawing').hidden = true;
       });
       model.addEventListener('error', () => {
-        message('プレビューを表示できませんでした', '作品カードを使ってARで見られます。');
+        message('プレビューを表示できませんでした', 'ページを開き直してください。');
       });
       model.dataset.source = modelVersion;
       model.src = asset(slot + '.glb', modelVersion);

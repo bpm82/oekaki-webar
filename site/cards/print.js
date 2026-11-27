@@ -23,7 +23,7 @@ function draw() {
     link.href = '../v/?id=' + id;
     link.textContent = 'この番号の作品を見る';
     const hint = document.createElement('p');
-    hint.textContent = 'QRを読み取り、カメラを同じ黒い枠にかざしてね。';
+    hint.textContent = 'QRを読み取ると、この作品を開けます。';
     card.append(heading, img, link, hint);
     list.append(card);
   }

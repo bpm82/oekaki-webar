@@ -4,14 +4,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>カードの作品 | おえかき立体工房</title>
-    <link rel="stylesheet" href="../style.css?v=7" />
+    <link rel="stylesheet" href="../style.css?v=8" />
   </head>
   <body>
     <header class="bar viewer-bar">
       <a class="brand" href="../"
         ><span class="brand-mark" aria-hidden="true"></span>おえかき立体工房</a
       >
-      <button id="new-reception" type="button" class="text-button" hidden>新規受付</button>
+      <details id="reception-menu" class="reception-menu" hidden>
+        <summary class="reception-toggle primary" aria-label="受付メニュー">
+          <span aria-hidden="true"></span>
+        </summary>
+        <div class="reception-options">
+          <button id="new-reception" type="button">新規受付</button>
+        </div>
+      </details>
     </header>
     <main class="wrap">
       <section class="viewer-panel">
@@ -22,14 +29,13 @@
         <div class="actions">
           <button id="play-waiting" type="button" class="primary" hidden>立体化を待ちながら遊ぶ</button>
           <button id="show-marker" type="button" class="primary" aria-haspopup="dialog" hidden>カードにかざす</button>
-          <a id="open-ar-camera" class="button" hidden>ARカメラを開く</a>
         </div>
         <noscript>作品を見るにはブラウザのJavaScriptを有効にしてください。</noscript>
       </section>
     </main>
     <dialog id="marker-dialog" class="marker-dialog" aria-labelledby="marker-title">
       <h2 id="marker-title">作品カード</h2>
-      <p>別のスマホでQRを読み取り、作品ページで「ARカメラを開く」を押して、この画面の黒い枠全体を映してね。</p>
+      <p>スマホでQRを読み取ると、この作品を開けます。</p>
       <img id="card-marker" width="360" height="360" alt="黒い枠付きの作品カードのQRコード" />
       <form method="dialog">
         <button type="submit" autofocus>閉じる</button>
@@ -41,6 +47,6 @@
       </form>
       <iframe id="wait-game-frame" title="クリスマス工房のミニゲーム"></iframe>
     </dialog>
-    <script type="module" src="./viewer.js?v=3"></script>
+    <script type="module" src="./viewer.js?v=4"></script>
   </body>
 </html>

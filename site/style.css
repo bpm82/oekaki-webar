@@ -502,6 +502,48 @@ select,
   align-items: center;
   padding-block: 0.35rem;
 }
+.reception-menu {
+  position: relative;
+  flex: none;
+}
+.reception-toggle {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.reception-toggle::-webkit-details-marker {
+  display: none;
+}
+.reception-toggle:focus-visible {
+  outline: 3px solid #de7925;
+  outline-offset: 3px;
+}
+.reception-toggle span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: -7px 0 currentColor, 7px 0 currentColor;
+}
+.reception-options {
+  position: absolute;
+  z-index: 1;
+  inset-inline-end: 0;
+  top: calc(100% + 0.4rem);
+  padding: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 0 6px 18px #182a2826;
+  white-space: nowrap;
+}
+.reception-options button {
+  border-color: transparent;
+}
 .work-ready .wrap {
   width: 100%;
   height: 100%;
