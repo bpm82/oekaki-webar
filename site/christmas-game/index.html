@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff4dc">
+  <title>クリスマス工房</title>
+  <link rel="stylesheet" href="game.css">
+  <script src="vendor/matter.min.js" defer></script>
+  <script src="decorations.js" defer></script>
+  <script src="tutorial.js" defer></script>
+  <script src="nickname.js" defer></script>
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <span class="brand"><span class="brand-icon" aria-hidden="true">✦</span> クリスマス工房</span>
+      <div class="header-actions">
+        <div id="session-clock" class="session-clock" role="timer" aria-labelledby="clock-label" hidden>
+          <span id="clock-label">残り時間</span><strong id="time-remaining">3:00</strong>
+        </div>
+        <button id="open-leaderboard" class="button header-button" type="button">全ランキング</button>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section id="welcome-screen" class="setup-screen" aria-labelledby="welcome-title">
+      <form id="start-form" class="setup-card" novalidate>
+        <canvas id="welcome-art" width="880" height="430" class="welcome-art" aria-hidden="true"></canvas>
+        <div class="welcome-copy">
+          <h1 id="welcome-title">ツリーを作ろう！</h1>
+          <p>飾りをくっつけて、どこまで大きくできるかな？</p>
+        </div>
+        <div class="start-fields">
+          <label for="player-name">ランキングに表示する名前</label>
+          <input id="player-name" name="player" maxlength="16" placeholder="ニックネーム" autocomplete="nickname" aria-describedby="nickname-error" required>
+          <p id="nickname-error" class="field-error" role="alert" hidden></p>
+          <button class="button primary" type="submit">スタート</button>
+        </div>
+      </form>
+    </section>
+    <section id="rules-screen" class="setup-screen" aria-labelledby="rules-title" hidden>
+      <div class="setup-card rules-card">
+        <h2 id="rules-title" tabindex="-1">遊び方</h2>
+        <ol class="rules">
+          <li class="rule-compact">
+            <div class="rule-copy"><h3>狙って落とす</h3><p>落としたい場所をタップ。左右に動かして、指を離しても落とせます。</p></div>
+            <canvas id="rule-drop" width="240" height="124" aria-hidden="true"></canvas>
+          </li>
+          <li class="rule-feature">
+            <div class="rule-copy"><h3>同じ飾りをくっつける</h3><p>ひと回り大きくなって、得点が入ります。</p></div>
+            <div class="rule-graphics">
+              <canvas id="rule-merge" width="500" height="82" role="img" aria-label="星のチャーム二つで丸いオーナメント一つになります。"></canvas>
+              <canvas id="rule-growth" width="560" height="80" role="img" aria-label="小さい順に星のチャーム、丸いオーナメント、スノードーム、プレゼント箱、雪だるま、サンタのそり、クリスマスツリー。"></canvas>
+            </div>
+          </li>
+          <li class="rule-compact">
+            <div class="rule-copy"><h3>1回3分</h3><p>時間切れか、箱からあふれたら終了です。立体化が終わるまでは再挑戦できます。</p></div>
+            <canvas id="rule-overflow" width="240" height="124" aria-hidden="true"></canvas>
+          </li>
+        </ol>
+        <div class="setup-actions">
+          <button id="back-to-welcome" class="button secondary" type="button">戻る</button>
+          <button id="begin-game" class="button primary" type="button">ゲームを始める</button>
+        </div>
+      </div>
+    </section>
+    <section id="game-screen" class="game-panel" aria-label="クリスマス工房のゲーム盤" hidden>
+      <div class="game-hud">
+        <div class="growth-guide" aria-labelledby="pieces-title">
+          <h2 id="pieces-title">成長順</h2>
+          <ol id="piece-guide"></ol>
+        </div>
+        <div class="next"><span>次の飾り</span><canvas id="next-piece" width="84" height="84" role="img" aria-label="次の飾り"></canvas></div>
+      </div>
+      <aside class="play-sidebar" aria-label="スコアとランキング">
+        <div class="scorebar">
+          <div class="score score-main">
+            <span class="score-label">スコア</span>
+            <div class="score-value"><strong id="score">0</strong><span id="score-gain" class="score-gain" aria-hidden="true"></span></div>
+          </div>
+          <div class="score best"><span>自己ベスト</span><strong id="best-score">—</strong></div>
+        </div>
+        <section class="play-ranking" aria-labelledby="play-ranking-title">
+          <h2 id="play-ranking-title">ランキング</h2>
+          <ol id="play-leaders" aria-label="上位5人"></ol>
+          <p class="live-rank" title="ほかの参加者のベストスコアと比較"><span>この回の順位</span><strong id="play-rank">—</strong></p>
+        </section>
+      </aside>
+      <div class="board-shell">
+        <canvas id="board" width="800" height="1000" tabindex="0" aria-label="ゲーム盤。左右の矢印キーで移動し、スペースキーで飾りを落とします。"></canvas>
+        <div id="round-start" class="round-start" role="status" data-counting="true" hidden><span id="round-start-label">3</span></div>
+        <div id="game-overlay" class="overlay" hidden>
+          <div id="round-result" class="overlay-card" hidden>
+            <h2 id="round-title" tabindex="-1"></h2>
+            <p id="round-score" class="round-score"></p>
+            <p id="round-top-five" class="round-top-five" hidden></p>
+            <p id="round-rank"></p>
+            <div id="round-actions">
+              <button id="retry" class="button primary" type="button">もう一回遊ぶ</button>
+              <button id="show-results" class="button primary" type="button" hidden>ランキングと作品へ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="status-bar">
+        <span id="status-icon" aria-hidden="true">✧</span>
+        <p id="status-title" aria-live="polite">立体化中</p>
+        <progress id="progress" aria-label="立体化の進み具合" max="180" value="0"></progress>
+      </div>
+    </section>
+  </main>
+  <dialog id="leaderboard" aria-labelledby="leaderboard-title">
+    <div class="dialog-heading">
+      <h2 id="leaderboard-title">ランキング</h2>
+      <form method="dialog"><button class="button secondary" type="submit">閉じる</button></form>
+    </div>
+    <p id="my-ranking" class="my-ranking" hidden></p>
+    <button id="open-work" class="button primary" type="button" hidden>立体化したサンプルを見る</button>
+    <div id="podium" class="podium" aria-label="上位3人"></div>
+    <p id="empty-ranking">プレイするとスコアがここに入ります。</p>
+    <section id="ranking-list" hidden>
+      <div class="ranking-list-heading"><h3 id="ranking-list-title">全員のランキング</h3><span>このブラウザの記録</span></div>
+      <div id="ranking-scroll" class="ranking-scroll" role="region" aria-labelledby="ranking-list-title" tabindex="0">
+        <table aria-labelledby="ranking-list-title">
+          <thead id="ranking-columns"><tr><th scope="col">順位</th><th scope="col">プレイヤー</th><th scope="col">ベストスコア</th></tr></thead>
+          <tbody id="ranking-padding-start" class="ranking-padding" aria-hidden="true" hidden><tr><td colspan="3"></td></tr></tbody>
+          <tbody id="ranking-rows"></tbody>
+          <tbody id="ranking-padding-end" class="ranking-padding" aria-hidden="true" hidden><tr><td colspan="3"></td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </dialog>
+  <dialog id="work-dialog" aria-labelledby="work-title">
+    <div class="dialog-heading">
+      <h2 id="work-title">立体作品のサンプル</h2>
+      <form method="dialog"><button class="button secondary" type="submit">閉じる</button></form>
+    </div>
+    <canvas id="work-preview" width="800" height="540" tabindex="0" aria-label="立体ツリー。ドラッグするか左右の矢印キーで回転できます。"></canvas>
+    <p class="controls">ドラッグ、または ← → で回転</p>
+  </dialog>
+</body>
+</html>

@@ -428,6 +428,7 @@ $('send').onclick = async () => {
     clearTimeout(expiryTimer);
     $('assigned').textContent = id;
     $('view-link').href = 'v/?id=' + id;
+    $('wait-game-link').href = 'v/?id=' + id + '&play=1';
     $('studio').hidden = true;
     $('receipt').hidden = false;
     $('view-link').focus();

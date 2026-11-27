@@ -1,7 +1,56 @@
 import { slot, currentWork, asset } from './slot.js';
 const $ = (id) => document.getElementById(id);
+const gameButton = $('play-waiting');
+const gameDialog = $('wait-game-dialog');
+const gameFrame = $('wait-game-frame');
+const fromReceipt = new URLSearchParams(location.search).get('play') === '1';
+let openOnce = fromReceipt;
+let generationState = 'pending';
 let activeModel = null;
 let timer;
+let checking = false;
+
+function sendGameState() {
+  if (gameDialog.open) {
+    gameFrame.contentWindow?.postMessage(
+      { type: 'oekaki-wait-game:state', state: generationState },
+      location.origin,
+    );
+  }
+}
+
+function openWaitingGame() {
+  if (gameButton.hidden || gameDialog.open) return;
+  if (!gameFrame.hasAttribute('src')) gameFrame.src = '../christmas-game/?embedded=1';
+  gameDialog.showModal();
+  sendGameState();
+}
+
+function updateWaitingGame(work) {
+  const state = work?.state ?? 'pending';
+  if (generationState !== 'pending' && state === 'pending' && !gameDialog.open) {
+    gameFrame.removeAttribute('src');
+  }
+  generationState = state;
+  gameButton.hidden = state !== 'pending' || (!work && !fromReceipt);
+  if (openOnce && !gameButton.hidden) {
+    openOnce = false;
+    openWaitingGame();
+  } else {
+    sendGameState();
+  }
+}
+
+gameButton.addEventListener('click', openWaitingGame);
+window.addEventListener('message', (event) => {
+  if (event.origin !== location.origin || event.source !== gameFrame.contentWindow) return;
+  if (event.data?.type === 'oekaki-wait-game:connected') sendGameState();
+  if (event.data?.type === 'oekaki-wait-game:show-work' && generationState !== 'pending' && gameDialog.open) {
+    gameDialog.close();
+    $('title').focus({ preventScroll: true });
+  }
+});
+
 function message(title, description) {
   $('title').textContent = title;
   $('message').textContent = description;
@@ -16,6 +65,7 @@ function showDrawing(work) {
   $('media').hidden = !work?.preview;
 }
 async function check() {
+  if (checking) return;
   clearTimeout(timer);
   if (!slot) {
     message('カード番号が見つかりません', 'カードに印刷されたQRをもう一度読み取ってください。');
@@ -24,8 +74,10 @@ async function check() {
   $('number').textContent = slot;
   $('card').hidden = false;
   $('card').href = '../cards/?id=' + slot;
+  checking = true;
   try {
     const work = await currentWork();
+    updateWaitingGame(work);
     const modelVersion = work?.modelVersion || work?.source;
     if (activeModel && activeModel.dataset.source !== modelVersion) {
       activeModel.remove();
@@ -91,6 +143,8 @@ async function check() {
       '作品の情報を取得できませんでした',
       'インターネットの接続を確認してください。自動で再確認します。',
     );
+  } finally {
+    checking = false;
   }
   checkLater();
 }

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>カードの作品 | おえかき立体工房</title>
-    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../style.css?v=6" />
   </head>
   <body>
     <header class="bar">
@@ -15,16 +15,23 @@
     <main class="wrap">
       <section class="viewer-panel">
         <p class="overline">作品カード <span id="number" class="number">—</span></p>
-        <h1 id="title">作品を確認しています</h1>
+        <h1 id="title" tabindex="-1">作品を確認しています</h1>
         <p id="message" role="status"></p>
         <div id="media" class="viewer-media" hidden><img id="drawing" alt="送信した絵" hidden /></div>
         <div class="actions">
-          <a id="ar" class="button primary" hidden>カードにかざす</a
+          <button id="play-waiting" type="button" class="primary" hidden>立体化を待ちながら遊ぶ</button
+          ><a id="ar" class="button primary" hidden>カードにかざす</a
           ><a id="card" hidden>このカードを印刷</a>
         </div>
         <noscript>作品を見るにはブラウザのJavaScriptを有効にしてください。</noscript>
       </section>
     </main>
-    <script type="module" src="./viewer.js"></script>
+    <dialog id="wait-game-dialog" class="wait-game-dialog" aria-label="クリスマス工房">
+      <form method="dialog" class="wait-game-toolbar">
+        <button type="submit">作品ページに戻る</button>
+      </form>
+      <iframe id="wait-game-frame" title="クリスマス工房のミニゲーム"></iframe>
+    </dialog>
+    <script type="module" src="./viewer.js?v=2"></script>
   </body>
 </html>
