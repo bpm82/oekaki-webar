@@ -486,6 +486,83 @@ select,
 [hidden] {
   display: none !important;
 }
+.work-ready,
+.work-ready body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.work-ready body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+}
+.work-ready .viewer-bar {
+  width: 100%;
+  flex-direction: row;
+  align-items: center;
+  padding-block: 0.35rem;
+}
+.work-ready .wrap {
+  width: 100%;
+  height: 100%;
+  padding-block: clamp(0.35rem, 2dvh, 1.1rem);
+}
+.work-ready .viewer-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0 auto;
+  padding: clamp(0.6rem, 2.3vmin, 1.35rem);
+}
+.work-ready .viewer-media {
+  flex: 1;
+  min-height: 0;
+  aspect-ratio: auto;
+  margin: 0.3rem 0 0;
+}
+.work-ready .viewer-panel .actions {
+  margin-top: 0.5rem;
+}
+.marker-dialog {
+  text-align: center;
+  padding: clamp(0.75rem, 3vmin, 1.4rem);
+}
+.marker-dialog img {
+  display: block;
+  width: min(100%, 22rem, 55dvh);
+  height: auto;
+  margin: 0 auto 0.7rem;
+}
+@media (max-height: 440px) and (orientation: landscape) {
+  .work-ready .viewer-panel,
+  .marker-dialog[open] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.8rem;
+  }
+  .work-ready .viewer-panel {
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+  }
+  .work-ready .viewer-panel > :not(.viewer-media) {
+    grid-column: 1;
+  }
+  .work-ready .viewer-panel .actions {
+    align-self: start;
+  }
+  .work-ready .viewer-media {
+    grid-area: 1 / 2 / -1;
+    margin: 0;
+  }
+  .marker-dialog {
+    width: min(37rem, calc(100% - 1rem));
+    align-items: center;
+  }
+  .marker-dialog img {
+    grid-area: 1 / 1 / 4;
+    width: min(100%, 74dvh);
+    margin: 0 auto;
+  }
+}
 .viewer-panel h1,
 .card-panel h1 {
   font-size: clamp(1.5rem, 4vw, 2.3rem);

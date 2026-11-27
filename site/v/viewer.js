@@ -1,8 +1,13 @@
 import { slot, currentWork, asset } from './slot.js';
+import { clearReceipt, readReceipt } from '../receipt.js';
 const $ = (id) => document.getElementById(id);
 const gameButton = $('play-waiting');
 const gameDialog = $('wait-game-dialog');
 const gameFrame = $('wait-game-frame');
+const markerButton = $('show-marker');
+const markerDialog = $('marker-dialog');
+const cameraLink = $('open-ar-camera');
+const newReception = $('new-reception');
 const fromReceipt = new URLSearchParams(location.search).get('play') === '1';
 let openOnce = fromReceipt;
 let generationState = 'pending';
@@ -42,6 +47,25 @@ function updateWaitingGame(work) {
 }
 
 gameButton.addEventListener('click', openWaitingGame);
+markerButton.addEventListener('click', () => {
+  $('card-marker').src = asset('marker.svg');
+  markerDialog.showModal();
+});
+newReception.addEventListener('click', () => {
+  if (newReception.hidden) return;
+  clearReceipt();
+  location.replace('../');
+});
+function updateCompletedActions() {
+  const ready = generationState === 'ready';
+  const submittedHere = slot !== null && readReceipt() === slot;
+  document.documentElement.classList.toggle('work-ready', ready);
+  markerButton.hidden = !ready;
+  newReception.hidden = !ready || !submittedHere;
+  cameraLink.hidden = !ready || submittedHere;
+  if (!cameraLink.hidden) cameraLink.href = 'ar.html?id=' + slot;
+}
+window.addEventListener('pageshow', updateCompletedActions);
 window.addEventListener('message', (event) => {
   if (event.origin !== location.origin || event.source !== gameFrame.contentWindow) return;
   if (event.data?.type === 'oekaki-wait-game:connected') sendGameState();
@@ -72,38 +96,32 @@ async function check() {
     return;
   }
   $('number').textContent = slot;
-  $('card').hidden = false;
-  $('card').href = '../cards/?id=' + slot;
   checking = true;
   try {
     const work = await currentWork();
     updateWaitingGame(work);
+    updateCompletedActions();
     const modelVersion = work?.modelVersion || work?.source;
     if (activeModel && activeModel.dataset.source !== modelVersion) {
       activeModel.remove();
       activeModel = null;
     }
     if (work?.state === 'ready') {
-      $('ar').href = 'ar.html?id=' + slot;
-      $('ar').hidden = false;
       if (activeModel) return;
       showDrawing(work);
-      message(
-        '立体ができました！',
-        '指で回して見てみよう。カードの上に出すときは「カードにかざす」を押してね。',
-      );
+      message('立体ができました！', '指で回して見てみよう。');
       try {
         await import('../vendor/model-viewer.js');
       } catch {
         message(
           '立体ができました！',
-          '3Dプレビューを読み込めませんでした。「カードにかざす」からARを開けます。',
+          '3Dプレビューを読み込めませんでした。作品カードを使ってARで見られます。',
         );
         return;
       }
       const model = document.createElement('model-viewer');
       model.setAttribute('camera-controls', '');
-      model.setAttribute('touch-action', 'pan-y');
+      model.setAttribute('touch-action', 'none');
       model.setAttribute('shadow-intensity', '0.7');
       model.setAttribute('alt', slot + '番の絵からできた3D作品');
       model.setAttribute('camera-orbit', '180deg 80deg auto');
@@ -112,7 +130,7 @@ async function check() {
         $('drawing').hidden = true;
       });
       model.addEventListener('error', () => {
-        message('プレビューを表示できませんでした', '下のボタンでカードのARを開けます。');
+        message('プレビューを表示できませんでした', '作品カードを使ってARで見られます。');
       });
       model.dataset.source = modelVersion;
       model.src = asset(slot + '.glb', modelVersion);
@@ -121,7 +139,6 @@ async function check() {
       activeModel = model;
       return;
     }
-    $('ar').hidden = true;
     showDrawing(work);
     if (work?.state === 'failed')
       message(

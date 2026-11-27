@@ -8,12 +8,12 @@ import {
   renewBefore,
 } from './upload.js?v=4';
 import { drawTemplate, drawingTemplates } from './drawing-templates.js';
+import { readReceipt, saveReceipt } from './receipt.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('sheet');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const settings = $('settings');
-const receiptKey = 'oekaki-webar:submitted-card';
 const history = [];
 const colors = [
   ['ink', 'すみ色'],
@@ -439,12 +439,8 @@ $('send').onclick = async () => {
     if (!lease) await claim(token, preferred);
     upload ??= await prepareUpload(await png());
     const id = await submitDrawing(token, upload, owner, lease.slot);
+    saveReceipt(id);
     showReceipt(id);
-    try {
-      sessionStorage.setItem(receiptKey, id);
-    } catch {
-      // The current page can still show the receipt when storage is blocked.
-    }
   } catch (error) {
     say(
       error instanceof TypeError
@@ -458,11 +454,6 @@ $('send').onclick = async () => {
     refresh();
   }
 };
-let savedCard;
-try {
-  savedCard = sessionStorage.getItem(receiptKey);
-} catch {
-  // A new drawing can still be started when storage is blocked.
-}
+const savedCard = readReceipt();
 if (slotIds.includes(savedCard)) showReceipt(savedCard);
 refresh();

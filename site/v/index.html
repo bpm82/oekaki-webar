@@ -4,13 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>カードの作品 | おえかき立体工房</title>
-    <link rel="stylesheet" href="../style.css?v=6" />
+    <link rel="stylesheet" href="../style.css?v=7" />
   </head>
   <body>
-    <header class="bar">
+    <header class="bar viewer-bar">
       <a class="brand" href="../"
         ><span class="brand-mark" aria-hidden="true"></span>おえかき立体工房</a
       >
+      <button id="new-reception" type="button" class="text-button" hidden>新規受付</button>
     </header>
     <main class="wrap">
       <section class="viewer-panel">
@@ -19,19 +20,27 @@
         <p id="message" role="status"></p>
         <div id="media" class="viewer-media" hidden><img id="drawing" alt="送信した絵" hidden /></div>
         <div class="actions">
-          <button id="play-waiting" type="button" class="primary" hidden>立体化を待ちながら遊ぶ</button
-          ><a id="ar" class="button primary" hidden>カードにかざす</a
-          ><a id="card" hidden>このカードを印刷</a>
+          <button id="play-waiting" type="button" class="primary" hidden>立体化を待ちながら遊ぶ</button>
+          <button id="show-marker" type="button" class="primary" aria-haspopup="dialog" hidden>カードにかざす</button>
+          <a id="open-ar-camera" class="button" hidden>ARカメラを開く</a>
         </div>
         <noscript>作品を見るにはブラウザのJavaScriptを有効にしてください。</noscript>
       </section>
     </main>
+    <dialog id="marker-dialog" class="marker-dialog" aria-labelledby="marker-title">
+      <h2 id="marker-title">作品カード</h2>
+      <p>別のスマホでQRを読み取り、作品ページで「ARカメラを開く」を押して、この画面の黒い枠全体を映してね。</p>
+      <img id="card-marker" width="360" height="360" alt="黒い枠付きの作品カードのQRコード" />
+      <form method="dialog">
+        <button type="submit" autofocus>閉じる</button>
+      </form>
+    </dialog>
     <dialog id="wait-game-dialog" class="wait-game-dialog" aria-label="クリスマス工房">
       <form method="dialog" class="wait-game-toolbar">
         <button type="submit">作品ページに戻る</button>
       </form>
       <iframe id="wait-game-frame" title="クリスマス工房のミニゲーム"></iframe>
     </dialog>
-    <script type="module" src="./viewer.js?v=2"></script>
+    <script type="module" src="./viewer.js?v=3"></script>
   </body>
 </html>
