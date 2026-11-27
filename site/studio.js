@@ -13,6 +13,7 @@ const $ = (id) => document.getElementById(id);
 const canvas = $('sheet');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const settings = $('settings');
+const receiptKey = 'oekaki-webar:submitted-card';
 const history = [];
 const colors = [
   ['ink', 'すみ色'],
@@ -32,7 +33,8 @@ let color,
   preferred = '',
   upload = null;
 let hasInk = false,
-  busy = false;
+  busy = false,
+  submittedCard = '';
 let owner = crypto.randomUUID();
 let lease = null,
   acquiring = null,
@@ -98,7 +100,7 @@ function refresh() {
     }
   }
   $('hint').hidden = hasInk;
-  $('send').disabled = !hasInk || busy;
+  $('send').disabled = !hasInk || busy || Boolean(submittedCard);
   $('undo').disabled = !history.length;
   $('download').disabled = !hasInk || busy;
 }
@@ -410,8 +412,20 @@ $('settings-form').onsubmit = async (e) => {
     lockSettings(false);
   }
 };
+function showReceipt(id) {
+  submittedCard = id;
+  clearTimeout(expiryTimer);
+  token = '';
+  $('assigned').textContent = id;
+  $('view-link').href = 'v/?id=' + id;
+  $('wait-game-link').href = 'v/?id=' + id + '&play=1';
+  $('studio').hidden = true;
+  $('receipt').hidden = false;
+  $('setup').disabled = true;
+  $('view-link').focus();
+}
 $('send').onclick = async () => {
-  if (busy || !hasInk) return;
+  if (busy || submittedCard || !hasInk) return;
   if (!token) {
     openSettings();
     return;
@@ -425,13 +439,12 @@ $('send').onclick = async () => {
     if (!lease) await claim(token, preferred);
     upload ??= await prepareUpload(await png());
     const id = await submitDrawing(token, upload, owner, lease.slot);
-    clearTimeout(expiryTimer);
-    $('assigned').textContent = id;
-    $('view-link').href = 'v/?id=' + id;
-    $('wait-game-link').href = 'v/?id=' + id + '&play=1';
-    $('studio').hidden = true;
-    $('receipt').hidden = false;
-    $('view-link').focus();
+    showReceipt(id);
+    try {
+      sessionStorage.setItem(receiptKey, id);
+    } catch {
+      // The current page can still show the receipt when storage is blocked.
+    }
   } catch (error) {
     say(
       error instanceof TypeError
@@ -441,21 +454,15 @@ $('send').onclick = async () => {
   } finally {
     busy = false;
     $('tools').disabled = false;
-    $('setup').disabled = !$('receipt').hidden;
+    $('setup').disabled = Boolean(submittedCard);
     refresh();
   }
 };
-$('next').onclick = () => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  history.length = 0;
-  upload = null;
-  forgetCard();
-  cardStatus('描き始めると、空いているカード番号を確保します。');
-  say('');
-  refresh();
-  $('receipt').hidden = true;
-  $('setup').disabled = false;
-  $('studio').hidden = false;
-  pickTool('pen');
-};
+let savedCard;
+try {
+  savedCard = sessionStorage.getItem(receiptKey);
+} catch {
+  // A new drawing can still be started when storage is blocked.
+}
+if (slotIds.includes(savedCard)) showReceipt(savedCard);
 refresh();
