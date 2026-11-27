@@ -1,5 +1,5 @@
 import { slot, currentWork, asset } from './slot.js';
-import { clearReceipt, readReceipt } from '../receipt.js';
+import { clearReceipt } from '../receipt.js?v=2';
 const $ = (id) => document.getElementById(id);
 const gameButton = $('play-waiting');
 const gameDialog = $('wait-game-dialog');
@@ -57,13 +57,11 @@ $('new-reception').addEventListener('click', () => {
 });
 function updateCompletedActions() {
   const ready = generationState === 'ready';
-  const submittedHere = slot !== null && readReceipt() === slot;
   document.documentElement.classList.toggle('work-ready', ready);
   markerButton.hidden = !ready;
-  receptionMenu.hidden = !ready || !submittedHere;
+  receptionMenu.hidden = !ready;
   if (receptionMenu.hidden) receptionMenu.open = false;
 }
-window.addEventListener('pageshow', updateCompletedActions);
 window.addEventListener('message', (event) => {
   if (event.origin !== location.origin || event.source !== gameFrame.contentWindow) return;
   if (event.data?.type === 'oekaki-wait-game:connected') sendGameState();

@@ -8,12 +8,13 @@ import {
   renewBefore,
 } from './upload.js?v=4';
 import { drawTemplate, drawingTemplates } from './drawing-templates.js';
-import { readReceipt, saveReceipt } from './receipt.js';
+import { readReceipt, saveReceipt } from './receipt.js?v=2';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('sheet');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const settings = $('settings');
+const tokenKey = 'oekaki-webar:staff-token';
 const history = [];
 const colors = [
   ['ink', 'すみ色'],
@@ -29,7 +30,7 @@ let color,
   tool = 'pen',
   pointer = null,
   lastPoint,
-  token = '',
+  temporaryToken = '',
   preferred = '',
   upload = null;
 let hasInk = false,
@@ -42,6 +43,16 @@ let lease = null,
   expiryTimer,
   editingSettings = false;
 
+function storedToken() {
+  try {
+    return localStorage.getItem(tokenKey) ?? '';
+  } catch {
+    return '';
+  }
+}
+function currentToken() {
+  return temporaryToken || storedToken();
+}
 function cardStatus(message) {
   $('card-status').textContent = message;
 }
@@ -75,6 +86,7 @@ function claim(key, slot) {
   return acquiring;
 }
 function drawingActivity() {
+  const token = currentToken();
   if (!token || acquiring || busy || Date.now() < retryAfter) return;
   if (lease && lease.expires - Date.now() > renewBefore) return;
   claim(token, preferred || lease?.slot || '').catch(() => {});
@@ -317,7 +329,7 @@ async function refreshSlots() {
   $('reload-slots').disabled = true;
   status.textContent = 'カードの空き状況を確認しています…';
   try {
-    const inventory = await cardInventory($('token').value.trim() || token);
+    const inventory = await cardInventory($('token').value.trim() || currentToken());
     if (request !== inventoryRequest) return;
     renderSlots(inventory);
     const free = slotIds.filter(
@@ -341,9 +353,13 @@ async function refreshSlots() {
 }
 $('reload-slots').onclick = refreshSlots;
 function openSettings() {
-  $('connection').textContent = token
-    ? 'このタブは設定済みです。'
-    : '送信するにはスタッフの設定が必要です。';
+  const token = currentToken();
+  $('connection').textContent = '送信するにはスタッフの設定が必要です。';
+  if (token) {
+    $('connection').textContent = temporaryToken
+      ? 'このタブは接続済みです。'
+      : 'このブラウザにトークンを保存済みです。';
+  }
   $('slot').value = preferred;
   $('disconnect').hidden = !token;
   renderSlots(null);
@@ -368,16 +384,29 @@ function lockSettings(locked) {
   for (const control of $('settings-form').elements) control.disabled = locked;
 }
 $('disconnect').onclick = async () => {
+  const token = currentToken();
   lockSettings(true);
   try {
-    await releaseCard(token, owner);
+    if (storedToken()) localStorage.removeItem(tokenKey);
+    temporaryToken = '';
+    let released = true;
+    if (token && lease) {
+      try {
+        await releaseCard(token, owner);
+      } catch {
+        released = false;
+      }
+    }
     forgetCard();
-    token = '';
     settings.close();
     cardStatus('カード番号を確保するには端末設定が必要です。');
-    say('このタブの接続を解除しました。');
-  } catch (error) {
-    $('connection').textContent = error.message;
+    say(
+      released
+        ? '接続を解除しました。'
+        : '接続を解除しました。カードの予約は期限が来ると空きに戻ります。',
+    );
+  } catch {
+    $('connection').textContent = '保存したトークンを削除できませんでした。';
   } finally {
     lockSettings(false);
   }
@@ -385,7 +414,8 @@ $('disconnect').onclick = async () => {
 $('settings-form').onsubmit = async (e) => {
   e.preventDefault();
   if (editingSettings) return;
-  const next = $('token').value.trim() || token;
+  const enteredToken = $('token').value.trim();
+  const next = enteredToken || currentToken();
   if (!next) {
     $('connection').textContent = 'トークンを入力してください。';
     $('token').focus();
@@ -400,11 +430,21 @@ $('settings-form').onsubmit = async (e) => {
   lockSettings(true);
   try {
     if (hasInk || lease || selection) await claim(next, selection);
-    else cardStatus('描き始めると、空いているカード番号を確保します。');
-    token = next;
+    else if (enteredToken) await cardInventory(next);
+    if (!lease) cardStatus('描き始めると、空いているカード番号を確保します。');
+    try {
+      localStorage.setItem(tokenKey, next);
+      temporaryToken = '';
+    } catch {
+      temporaryToken = next;
+    }
     preferred = selection;
     settings.close();
-    say('端末を設定しました。');
+    say(
+      temporaryToken
+        ? 'このタブは接続しました。ブラウザに保存できませんでした。'
+        : 'このブラウザに端末設定を保存しました。',
+    );
   } catch (error) {
     $('connection').textContent = error.message;
     await refreshSlots();
@@ -415,7 +455,6 @@ $('settings-form').onsubmit = async (e) => {
 function showReceipt(id) {
   submittedCard = id;
   clearTimeout(expiryTimer);
-  token = '';
   $('assigned').textContent = id;
   $('view-link').href = 'v/?id=' + id;
   $('wait-game-link').href = 'v/?id=' + id + '&play=1';
@@ -426,6 +465,7 @@ function showReceipt(id) {
 }
 $('send').onclick = async () => {
   if (busy || submittedCard || !hasInk) return;
+  const token = currentToken();
   if (!token) {
     openSettings();
     return;
@@ -438,6 +478,8 @@ $('send').onclick = async () => {
     if (acquiring) await acquiring;
     if (!lease) await claim(token, preferred);
     upload ??= await prepareUpload(await png());
+    if (currentToken() !== token)
+      throw new Error('端末の接続が変わりました。もう一度「完成」を押してください。');
     const id = await submitDrawing(token, upload, owner, lease.slot);
     saveReceipt(id);
     showReceipt(id);
@@ -456,4 +498,5 @@ $('send').onclick = async () => {
 };
 const savedCard = readReceipt();
 if (slotIds.includes(savedCard)) showReceipt(savedCard);
+else if (currentToken()) cardStatus('描き始めると、空いているカード番号を確保します。');
 refresh();

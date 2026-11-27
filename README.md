@@ -40,7 +40,7 @@ GitHub ActionsがモデルのUVを展開し、頂点カラーを1024×1024のベ
 
 1. スタッフが `bpm82` でGitHubにサインインし、[Fine-grained personal access token の作成画面](https://github.com/settings/personal-access-tokens/new?name=oekaki-workshop&target_name=bpm82&contents=write)を開きます。
 2. 有効期限をイベントに合わせ、「Only select repositories」で `oekaki-webar` を選びます。「Repository permissions」で **Contents** を **Read and write** にして発行します。
-3. 店頭の[お絵かき画面](https://bpm82.github.io/oekaki-webar/)を開き、「端末設定」にトークンを入力して「設定を保存」を押します。次のお客さんのときは、送信したタブで完成した作品を開き、右上の四角い受付メニューから「新規受付」を押します。空のお絵かき画面に戻るので、スタッフが端末設定をしてから始めます。
+3. 店頭の[お絵かき画面](https://bpm82.github.io/oekaki-webar/)を開き、「端末設定」にトークンを入力して「設定を保存」を押します。トークンは同じブラウザに保存されます。次のお客さんのときは、完成した作品の右上にある四角い受付メニューから「新規受付」を押すと、空のお絵かき画面に戻ります。端末の利用を終えるときは「端末設定 → 接続を解除して番号を返す」で、保存したトークンを削除できます。
 
 トークンを入れるのはスタッフが管理する端末だけです。作品を見る人はGitHubへのログイン不要です。入力のPNGと生成したGLBは公開されます。作品に氏名などを入れない運用にしてください。
 

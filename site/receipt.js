@@ -17,5 +17,9 @@ export function saveReceipt(card) {
 }
 
 export function clearReceipt() {
-  sessionStorage.removeItem(receiptKey);
+  try {
+    sessionStorage.removeItem(receiptKey);
+  } catch {
+    // There is no accessible receipt to clear when storage is blocked.
+  }
 }
