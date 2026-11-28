@@ -120,8 +120,9 @@ export function charmScene(THREE, canvas) {
     // Prune replaced/withdrawn models too, including an in-flight older GLB.
     for (const [id, work] of works) {
       const entry = catalog[id];
-      if (entry?.state !== 'ready' || (entry.modelVersion || entry.source) !== work.version ||
-          now - work.lastSeen > 20000) removeWork(id, work);
+      if (entry?.state !== 'ready' || (entry.modelVersion || entry.source) !== work.version) {
+        removeWork(id, work);
+      }
     }
     for (const { id, position } of cards) {
       const entry = catalog[id];
@@ -149,7 +150,7 @@ export function charmScene(THREE, canvas) {
         scene.add(anchor);
         if (work.model) anchor.add(work.model.clone());
       }
-      if (anchor.visible) {
+      if (anchor.visible && now - anchor.userData.lastSeen < 200) {
         anchor.position.lerp(pose.position, 0.75);
         anchor.quaternion.slerp(pose.rotation, 0.55);
       } else {
@@ -161,6 +162,12 @@ export function charmScene(THREE, canvas) {
     }
     const result = { ready: [], loading: [], error: [] };
     for (const [id, work] of works) {
+      // Check expiry after this frame's sightings so returning from a suspended
+      // tab or a slow frame does not discard a model that is still in view.
+      if (now - work.lastSeen > 20000) {
+        removeWork(id, work);
+        continue;
+      }
       for (const anchor of work.anchors) {
         anchor.visible = now - anchor.userData.lastSeen < 200;
         if (anchor.visible) result[work.state].push(id);

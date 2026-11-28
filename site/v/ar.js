@@ -1,5 +1,5 @@
 import { cardNumber, slot, workCatalog } from './slot.js?v=2';
-import { charmScene } from './charm-scene.js';
+import { charmScene } from './charm-scene.js?v=2';
 
 const status = document.getElementById('status');
 const video = document.getElementById('camera');
