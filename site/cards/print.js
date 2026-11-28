@@ -24,7 +24,17 @@ function draw() {
     link.textContent = 'この番号の作品を見る';
     const hint = document.createElement('p');
     hint.textContent = 'QRを読んでカメラを許可し、このカードの黒い枠全体を映してね。';
-    card.append(heading, img, link, hint);
+    const downloads = document.createElement('div');
+    downloads.className = 'card-downloads no-print';
+    for (const format of ['png', 'svg']) {
+      const save = document.createElement('a');
+      save.href = '../assets/' + id + '/marker.' + format;
+      save.download = 'QR-' + id + '.' + format;
+      save.textContent = format.toUpperCase() + 'で保存';
+      save.setAttribute('aria-label', id + '番のQRを' + save.textContent);
+      downloads.append(save);
+    }
+    card.append(heading, img, link, hint, downloads);
     list.append(card);
   }
 }

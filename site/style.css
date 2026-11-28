@@ -685,6 +685,12 @@ select,
 .printed-card a {
   font-weight: 750;
 }
+.card-downloads {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
 .printed-card p {
   font-size: 0.88rem;
 }

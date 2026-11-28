@@ -55,7 +55,7 @@ gameDialog.addEventListener('close', () => {
   gameFrame.contentWindow?.postMessage({ type: 'oekaki-wait-game:closed' }, location.origin);
 });
 markerButton.addEventListener('click', () => {
-  $('card-marker').src = asset('marker.svg');
+  $('card-marker').src = asset('marker.png');
   markerDialog.showModal();
 });
 $('new-reception').addEventListener('click', () => {
