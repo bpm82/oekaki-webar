@@ -11,7 +11,7 @@
 | `drawing.png` | 立体化する元の絵 |
 | `01.glb` | 01番のQRで表示する3Dモデル |
 | `marker.svg` | 印刷できるQR付きのマーカー画像 |
-| `pattern.patt` | カメラがマーカーを認識するためのデータ |
+| `pattern.patt` | 従来のARマーカー用の認識データ |
 | `status.json` | どの絵を変換したかと処理結果 |
 
 受付前のフォルダにはQR画像とマーカーデータが入っています。作品ごとの追加素材も同じ番号に置けます。WebARはその番号と同じ名前のGLBを表示します。
@@ -28,7 +28,7 @@ GitHub ActionsがモデルのUVを展開し、頂点カラーを1024×1024のベ
 2. お客さんはひとり1枚、絵を描いて「完成！ 立体にする」を押します。別のお絵かきアプリで描いたPNGも「PNGを開く」から取り込めます。
 3. 最初のひと筆かPNGの読み込みで、空いている最小の番号を確保します。画面に「02番で描いています」と出たら、02番のカードを渡せます。「端末設定」で番号を指定する場合は「設定を保存」で確保します。ほかの端末ではその番号が「描画中」になり、送信後は「使用済み」になります。どちらも選べません。
 4. 店頭端末の「作品を開く」で、カメラを使わず立体を指で回して見られます。生成中は「立体化を待ちながら遊ぶ」からクリスマス工房で遊べます。
-5. 印刷カードのQRをスマホで読むと、同じ番号のWebARが開きます。カメラを許可し、QRの黒い枠全体を映すとカードの上に作品が現れます。印刷カードが手元にない場合は、店頭端末の「カードにかざす」で同じQRを画面に出せます。
+5. 印刷カードのQRを1枚読んでWebARを開き、カメラを許可します。完成した作品のカードを一緒に映すと、それぞれのQRの上にチャームが現れます。別の枝にカメラを向けるだけで、そこにある作品も見られます。読み取りづらいときは、枝や飾りがQRに重ならないようにして、少し近づいてください。紙のカードが手元にない場合は、店頭端末の「カードにかざす」で同じQRを画面に出せます。
 
 店頭の「立体化を待ちながら遊ぶ」で1回遊び終わると、端末設定を使って、[今回のイベントの得点記録](rankings/itami-christmas-2026.json)に作品番号・ニックネーム・その回の点数・時刻が自動で追加されます。プレイ中に「作品ページに戻る」を押した場合は、その時点の点数を記録します。
 
@@ -66,4 +66,4 @@ GitHub ActionsがモデルのUVを展開し、頂点カラーを1024×1024のベ
 
 - 第8回伊丹マルシェの番号別GLB・パターンの対応、マーカートラッキング、材質設定を引き継ぎました。印刷カードは同イベントのQR生成ライブラリと、QR画像を4方向から16×16に縮小する方式を使っています。[WebAR本体](https://github.com/met-achievements/The-8th-ITAMI-Workshop-March-/blob/main/webar-project/index.html) ・ [チケット用マーカー](https://github.com/met-achievements/The-8th-ITAMI-Workshop-March-/blob/main/christmas-snow-globe/ticket-marker.mjs)
 - 個人プロジェクトで使っていた、読み込み状態を表示するWebARと、カメラを開く前に指でモデルを回せるビューを取り入れました。[bpm82/webar-project](https://github.com/bpm82/webar-project/blob/ar-stg/index.html) ・ [bpm82/nomark-webar-project](https://github.com/bpm82/nomark-webar-project)
-- 画像からの立体化には [TripoSR](https://github.com/VAST-AI-Research/TripoSR) と [公開モデルの重み](https://huggingface.co/stabilityai/TripoSR) を使用しています。カード生成に同梱した Kazuhiko Arase の QR Code Generator はMITライセンスです。表示には A-Frame、AR.js、Google の model-viewer を使用しています。
+- 画像からの立体化には [TripoSR](https://github.com/VAST-AI-Research/TripoSR) と [公開モデルの重み](https://huggingface.co/stabilityai/TripoSR) を使用しています。カード生成に同梱した Kazuhiko Arase の QR Code Generator はMITライセンスです。複数のQRの読み取りには [ZXing-WASM](https://github.com/Sec-ant/zxing-wasm)、立体の表示には A-Frame 同梱の Three.js と Google の model-viewer を使用しています。
